@@ -1004,6 +1004,7 @@ body {
         padding: 10px 12px;
         font-size: 13px;
         width: 100%;
+        max-width: 100%;
     }
 
     .service-card {
