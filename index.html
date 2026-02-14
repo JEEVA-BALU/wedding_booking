@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaveri Wedding Hall Booking</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <header class="header">
+        <div class="container header-content">
+            <div class="logo">
+                <i class="fas fa-gopuram"></i>
+                <div class="logo-text">
+                    <h1>காவேரி திருமண மண்டபம்</h1>
+                    <p>Kaveri Wedding Hall</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="navDashboard" class="google-btn" style="background: #6c5ce7;" onclick="showDashboard()">
+                    <i class="fas fa-list"></i> Dashboard
+                </button>
+                <button id="navNewBooking" class="google-btn" style="background: #00b894; display: none;" onclick="showBookingForm()">
+                    <i class="fas fa-plus"></i> New Booking
+                </button>
+                
+                <button id="googleSignInBtn" class="google-btn disabled" disabled>
+                    <i class="fas fa-spinner fa-spin fab" id="btnLoader"></i>
+                    <span id="btnText">Loading...</span>
+                </button>
+            </div>
+        </div>
+    </header>
+    <section id="dashboardSection" class="booking-section" style="display: none;">
+        <div class="container">
+            <div class="form-card" style="max-width: 1200px;">
+                <div class="form-header" style="background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);">
+                    <i class="fas fa-table"></i>
+                    <h3>Booking Management</h3>
+                </div>
+                
+                <div class="dashboard-controls" style="padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; align-items: center;">
+    
+                    <div style="flex-grow: 1;">
+                        <input type="text" id="searchInput" placeholder="Search customer name..." 
+                            style="padding: 10px; width: 100%; max-width: 300px; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label>Rows per page:</label>
+                        <input type="number" id="rowsPerPage" value="10" min="1" max="100" 
+                            style="padding: 8px; width: 60px; border: 1px solid #ccc; border-radius: 5px; text-align: center;">
+                    </div>
+
+                    <button onclick="fetchBookings()" class="preview-btn"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+
+                <div class="table-responsive" style="padding: 0 20px 20px;">
+                    <table class="bookings-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer Name</th>
+                                <th>Time</th>
+                                <th>Details</th> <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookingsTableBody">
+                            </tbody>
+                    </table>
+                </div>
+                <div id="paginationControls" style="padding: 20px; display: flex; justify-content: center; gap: 5px;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="booking-section" id="bookingSection">
+        <div class="container">
+            <div class="form-card">
+                <div class="form-header">
+                    <i class="fas fa-calendar-alt"></i>
+                    <h3>Wedding Hall Booking Form</h3>
+                </div>
+
+                <form id="bookingForm" novalidate>
+                    <input type="hidden" id="editEventId" value="">
+                    <div class="form-section">
+                        <h4 class="section-title"><i class="fas fa-info-circle"></i> Basic Details</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Marriage Date *</label>
+                                <input type="date" id="marriageDate" required>
+                                <small class="error-text" id="marriageDateError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>From Date & Time *</label>
+                                <input type="datetime-local" id="fromDateTime" required>
+                                <small class="error-text" id="fromDateTimeError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>To Date & Time *</label>
+                                <input type="datetime-local" id="toDateTime" required>
+                                <small class="error-text" id="toDateTimeError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Marriage Person Name *</label>
+                                <input type="text" id="marriagePersonName" placeholder="Ex: Ram Kumar" required minlength="3">
+                                <small class="error-text" id="marriagePersonNameError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Booking Date *</label>
+                                <input type="datetime-local" id="bookingDate" required>
+                                <small class="error-text" id="bookingDateError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Mobile Number (10 Digits) *</label>
+                                <input type="tel" id="mobileNumber" maxlength="10" placeholder="9944XXXXXX" required pattern="[0-9]{10}">
+                                <small class="error-text" id="mobileError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Customer City *</label>
+                                <input type="text" id="customerFrom" required minlength="2">
+                                <small class="error-text" id="customerFromError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Amount Given By *</label>
+                                <input type="text" id="amountGivenBy" required minlength="3">
+                                <small class="error-text" id="amountGivenByError"></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section bg-highlight">
+                        <h4 class="section-title"><i class="fas fa-rupee-sign"></i> Payment Details</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Total Hall Amount *</label>
+                                <input type="number" id="totalHallAmount" value="22000" min="1000" step="500" required>
+                                <small class="error-text" id="totalHallAmountError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Advance Amount</label>
+                                <input type="number" id="advanceAmount" value="0" min="0" step="100">
+                                <small class="error-text" id="advanceAmountError"></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Pending Amount (Auto)</label>
+                                <input type="number" id="pendingAmount" readonly class="readonly-field">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h4 class="section-title"><i class="fas fa-concierge-bell"></i> Additional Services</h4>
+                        <div class="services-grid">
+                            <div class="service-card">
+                                <div class="chk-group">
+                                    <input type="checkbox" id="cleaningFee" checked>
+                                    <label for="cleaningFee">Cleaning Fee</label>
+                                </div>
+                                <input type="number" id="cleaningFeeAmount" value="1500" min="0" step="100" class="fee-input">
+                            </div>
+
+                            <div class="service-card">
+                                <div class="chk-group">
+                                    <input type="checkbox" id="acRooms">
+                                    <label for="acRooms">AC Rooms</label>
+                                </div>
+                                <input type="number" id="acRoomsAmount" value="2000" min="0" step="100" class="fee-input">
+                            </div>
+
+                            <div class="service-card">
+                                <div class="chk-group">
+                                    <input type="checkbox" id="serialLights">
+                                    <label for="serialLights">Serial Lights</label>
+                                </div>
+                                <input type="number" id="serialLightsAmount" value="2500" min="0" step="100" class="fee-input">
+                            </div>
+
+                            <div class="service-card">
+                                <div class="chk-group">
+                                    <input type="checkbox" id="speaker">
+                                    <label for="speaker">Speaker</label>
+                                </div>
+                                <input type="number" id="speakerAmount" value="1500" min="0" step="100" class="fee-input">
+                            </div>
+
+                            <div class="service-card">
+                                <div class="chk-group">
+                                    <input type="checkbox" id="sapaduIlai" checked>
+                                    <label for="sapaduIlai">Sapadu Ilai</label>
+                                </div>
+                                <input type="number" id="sapaduIlaiAmount" value="3000" min="0" step="100" class="fee-input">
+                            </div>
+
+                            <div class="service-card full-width">
+                                <div class="chk-group">
+                                    <input type="checkbox" id="others">
+                                    <label for="others">Others</label>
+                                </div>
+                                <div id="othersFields" style="display: none; width: 100%; margin-top: 10px; gap: 10px;" class="others-flex">
+                                    <input type="text" id="otherTitle"  class="fee-input" placeholder="Service Name" style="flex: 2;">
+                                    <input type="number" id="otherAmount"  class="fee-input" value="0" min="0" step="100" placeholder="Amount" style="flex: 1;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions sticky-footer">
+                        <div class="total-display">
+                            <span>Final Total:</span>
+                            <h2 id="displayFinal">₹ 0</h2>
+                        </div>
+                        <div class="button-group">
+                            <button type="button" id="cancelEditBtn" class="preview-btn" style="background:#636e72; display:none;" onclick="cancelEdit()">
+                                Cancel
+                            </button>
+                            
+                            <button type="button" id="previewPdfBtn" class="preview-btn">
+                                <i class="fas fa-eye"></i>
+                                Preview PDF
+                            </button>
+                            
+                            <button type="submit" id="submitBtn" class="submit-btn">
+                                <i class="fas fa-check-circle"></i>
+                                Confirm & Download
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- PDF Template -->
+    <div id="pdf-container-wrapper">
+        <div id="pdf-template">
+            <div class="pdf-page">
+                
+                <!-- Header -->
+                <div class="pdf-header">
+                    <h1>காவேரி திருமண மண்டபம்</h1>
+                    <h2>KAVERI WEDDING HALL</h2>
+                    <div class="receipt-badge">Booking Receipt / முன்பதிவு ரசீது</div>
+                </div>
+                
+                <div class="pdf-line"></div>
+
+                <!-- Basic Info -->
+                <div class="pdf-row">
+                    <div class="pdf-cell">
+                        <div class="label-text">📅 முன்பதிவு தேதி (Registration Date)</div>
+                        <div class="value-text" id="pdf_bookingDate">16 Feb 2026</div>
+                    </div>
+                    <div class="pdf-cell">
+                        <div class="label-text">📅 திருமண தேதி (Marriage Date)</div>
+                        <div class="value-text" id="pdf_marriageDate">16 Feb 2026</div>
+                    </div>
+                    <div class="pdf-cell right">
+                        <div class="label-text">👤 பெயர் (Name)</div>
+                        <div class="value-text name-highlight" id="pdf_name">SAMPLE NAME</div>
+                    </div>
+                </div>
+
+                <!-- Event Time -->
+                <div class="time-box">
+                    <div class="time-label">🕒 திருமணம் நடைபெறும் தேதி (Event Time)</div>
+                    <div class="time-content">
+                        <span id="pdf_from">16 Feb 2026, 12:09 am</span>
+                        <strong> to </strong>
+                        <span id="pdf_to">16 Feb 2026, 12:09 am</span>
+                    </div>
+                </div>
+
+                <div class="pdf-line"></div>
+
+                <!-- Payment Details -->
+                <div class="payment-section">
+                    <div class="payment-row">
+                        <span class="pay-label">🏢 மண்டபம் வாடகை தொகை (Hall Rent)</span>
+                        <span class="pay-value">₹ <span id="pdf_hall">22,000</span></span>
+                    </div>
+                    <div class="payment-row">
+                        <span class="pay-label">💰 முன்பணம் தொகை (Advance Paid)</span>
+                        <span class="pay-value">₹ <span id="pdf_advance">0</span></span>
+                    </div>
+                    <div class="payment-row pending-row">
+                        <span class="pay-label"><strong>💵 மண்டபம் வாடகை பாக்கி (Pending Amount)</strong></span>
+                        <span class="pay-value"><strong>₹ <span id="pdf_pending">22,000</span></strong></span>
+                    </div>
+                </div>
+
+                <!-- Additional Services -->
+                <div class="services-section">
+                    <div class="services-title">கூடுதல் சேவைகள் (Additional Services)</div>
+                    <div id="pdf_services_list" class="services-content">
+                        <!-- Services populated by JS -->
+                    </div>
+                </div>
+
+                <div class="pdf-line"></div>
+
+                <!-- Final Total -->
+                <div class="total-box">
+                    <span>🧾 மொத்த இறுதி தொகை (Final Total)</span>
+                    <span class="total-value">₹ <span id="pdf_final">22,000</span></span>
+                </div>
+
+                <!-- Important Notes -->
+                <div class="notes-section">
+                    <div class="notes-title">📌 முக்கிய குறிப்பு :</div>
+                    <div class="notes-title">⚡ கரெண்ட் பில் தனி யூனிட்டுக்கு ₹30 (கரெண்ட் கட்டணம் இதில் சேர்க்கப்படவில்லை)(Electricity Bill Extra): ₹30 / Unit</div>
+                    <ul class="notes-list">
+                        <li>🌺 மற்ற அனைத்து கட்டணங்களும் வாடிக்கையாளர்கள் பார்த்துக் கொள்ள வேண்டும்.</li>
+                        <li>💧 கேன் வாட்டர் குறைந்த விலையில் கிடைக்கும்.</li>
+                        <li>📞 கூடுதல் வசதி தேவைப்பட்டால் 1 வாரத்திற்கு முன் தெரிவிக்கவும்.</li>
+                        <li>🔋 ஜெனரேட்டர் வசதி இல்லை.</li>
+                    </ul>
+                </div>
+
+                <div class="pdf-line dashed"></div>
+
+                <!-- Footer Info -->
+                <div class="footer-section">
+                    <div class="footer-row">
+                        <div class="footer-left">
+                            <div class="footer-label">முன்பதிவு செய்தவர் (Booked by) :</div>
+                            <div class="footer-value"><strong><span id="pdf_givenBy">Name</span>, <span id="pdf_city">City</span></strong></div>
+                        </div>
+                        <div class="footer-right">
+                            <div class="footer-label">தொலைபேசி எண் (Mobile Number) :</div>
+                            <div class="footer-value"><strong id="pdf_mobile">9999999999</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thank You -->
+                <div class="thankyou-section">
+                    <strong>Thank You For Choosing Kaveri Thirumana Mandapam! | நன்றி!</strong><br>
+                    📱 Contact: +91 99446 45441
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Preview Modal -->
+    <div id="pdfPreviewModal" class="modal">
+        <div class="preview-modal-box">
+            <div class="preview-header">
+                <h3>📄 Receipt Preview</h3>
+                <button onclick="closeModal('pdfPreviewModal')" class="close-preview">×</button>
+            </div>
+            <div class="preview-body">
+                <!-- Preview content will be inserted here -->
+            </div>
+            <div class="preview-footer">
+                <button onclick="closeModal('pdfPreviewModal')" class="btn-secondary">Close Preview</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="modal">
+        <div class="modal-box">
+            <div class="spinner"></div>
+            <h3>Processing...</h3>
+            <p>Generating PDF & Updating Calendar</p>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal">
+        <div class="modal-box alert-box">
+            <i class="fas fa-exclamation-circle icon-error"></i>
+            <h3 id="alertTitle">Error</h3>
+            <p id="alertMsg">Something went wrong</p>
+            <button onclick="closeModal('alertModal')" class="btn-close">Close</button>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-box success-box">
+            <i class="fas fa-check-circle icon-success"></i>
+            <h3>Success!</h3>
+            <p>Booking Confirmed & PDF Downloaded.</p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button onclick="openWhatsApp()" class="submit-btn" style="background: #25D366; border: none;">
+                    <i class="fab fa-whatsapp"></i> Send to Customer
+                </button>
+                
+                <button onclick="closeModal('successModal')" class="btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>
