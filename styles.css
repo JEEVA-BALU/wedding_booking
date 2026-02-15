@@ -758,7 +758,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 15px;
 }
 
 .add-other-btn:hover {
@@ -868,6 +868,7 @@ body {
     font-size: 15px; 
     cursor: pointer; 
     transition: var(--transition);
+    justify-content: center;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1799,17 +1800,17 @@ body {
     
     .notification-dropdown {
         width: 95vw;
-        right: -10px;
+        right: 0;
+        left: 0;
     }
 
     .google-btn {
         padding: 9px 16px;
         font-size: 13px;
-        flex: 1;
     }
 
     .form-section {
-        padding: 24px 18px;
+        padding: 24px 18px 110px;
     }
 
     .section-title {
@@ -1950,7 +1951,7 @@ body {
     }
     
     .other-service-row {
-        flex-direction: column;
+        flex-direction: row;
     }
     
     .other-service-row input {
@@ -2144,6 +2145,10 @@ select option[value="REFUND"],
 }
 
 .amount-cell {
-    text-align: right;
     font-family: 'Courier New', monospace;
+}
+@media (max-width: 480px) {
+.google-mail{
+     width: 48%;
+}
 }
