@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -26,6 +28,25 @@
                 </div>
             </div>
             <div class="header-actions">
+                <!-- Notification Bell -->
+                <div class="notification-wrapper">
+                    <button id="notificationBtn" class="notification-btn" onclick="toggleNotifications()">
+                        <i class="fas fa-bell"></i>
+                        <span id="notificationBadge" class="notification-badge">0</span>
+                    </button>
+                    
+                    <!-- Notification Dropdown -->
+                    <div id="notificationDropdown" class="notification-dropdown">
+                        <div class="notification-header">
+                            <h4>🔔 Notifications</h4>
+                            <button onclick="toggleNotifications()" class="close-notification">×</button>
+                        </div>
+                        <div id="notificationList" class="notification-list">
+                            <!-- Notifications will be populated here -->
+                        </div>
+                    </div>
+                </div>
+                
                 <button id="navDashboard" class="google-btn" style="background: #6c5ce7;" onclick="showDashboard()">
                     <i class="fas fa-list"></i> Dashboard
                 </button>
@@ -33,13 +54,17 @@
                     <i class="fas fa-plus"></i> New Booking
                 </button>
                 
-                <button id="googleSignInBtn" class="google-btn disabled" disabled>
-                    <i class="fas fa-spinner fa-spin fab" id="btnLoader"></i>
-                    <span id="btnText">Loading...</span>
-                </button>
+                <div style="position: relative;">
+                    <button id="googleSignInBtn" class="submit-btn disabled" disabled>
+                        <i class="fas fa-spinner fa-spin" id="btnLoader"></i>
+                        <span id="btnText">Initializing...</span>
+                    </button>
+                </div>
             </div>
         </div>
     </header>
+
+    <!-- Dashboard Section -->
     <section id="dashboardSection" class="booking-section" style="display: none;">
         <div class="container">
             <div class="form-card" style="max-width: 1200px;">
@@ -61,7 +86,12 @@
                             style="padding: 8px; width: 60px; border: 1px solid #ccc; border-radius: 5px; text-align: center;">
                     </div>
 
-                    <button onclick="fetchBookings()" class="preview-btn"><i class="fas fa-sync"></i> Refresh</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="fetchBookings()" class="preview-btn"><i class="fas fa-sync"></i> Refresh</button>
+                        <button onclick="showReportReview()" class="preview-btn" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">
+                            <i class="fas fa-chart-line"></i> Report Review
+                        </button>
+                    </div>
                 </div>
 
                 <div class="table-responsive" style="padding: 0 20px 20px;">
@@ -71,11 +101,12 @@
                                 <th>Date</th>
                                 <th>Customer Name</th>
                                 <th>Time</th>
-                                <th>Details</th> <th>Actions</th>
+                                <th>Details</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="bookingsTableBody">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
                 <div id="paginationControls" style="padding: 20px; display: flex; justify-content: center; gap: 5px;">
@@ -84,6 +115,181 @@
         </div>
     </section>
 
+    <!-- Report Review Section -->
+    <section id="reportSection" class="booking-section" style="display: none;">
+        <div class="container" style="max-width: 1400px;">
+            <div class="form-card">
+                <div class="form-header" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">
+                    <i class="fas fa-chart-bar"></i>
+                    <h3>Report & Analytics</h3>
+                </div>
+
+                <div style="padding: 20px;">
+                    <button onclick="showDashboard()" class="btn-secondary" style="margin-bottom: 20px;">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </button>
+
+                    <!-- Summary Cards -->
+                    <div class="summary-section">
+                        <div class="summary-card">
+                            <i class="fas fa-tasks"></i>
+                            <div>
+                                <h4>Total Functions</h4>
+                                <p id="totalFunctions">0</p>
+                            </div>
+                        </div>
+                        <div class="summary-card" style="background: linear-gradient(135deg, #00b894 0%, #00a085 100%);">
+                            <i class="fas fa-wallet"></i>
+                            <div>
+                                <h4>Overall Income</h4>
+                                <p id="overallIncome">₹0</p>
+                            </div>
+                        </div>
+                        <div class="summary-card" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">
+                            <i class="fas fa-hand-holding-usd"></i>
+                            <div>
+                                <h4>Overall Expenses</h4>
+                                <p id="overallExpenses">₹0</p>
+                            </div>
+                        </div>
+                        <div class="summary-card" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">
+                            <i class="fas fa-chart-line"></i>
+                            <div>
+                                <h4>Net Profit</h4>
+                                <p id="netProfit">₹0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Section -->
+                   <div class="filter-section">
+                    <h4 style="margin-bottom: 15px;"><i class="fas fa-filter"></i> Filter Options</h4>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                        
+                        <select id="reportDateFilter" onchange="handleDateFilter()" style="padding: 10px; border: 2px solid #dfe6e9; border-radius: 8px;">
+                            <option value="all">All Time</option>
+                            <option value="today">Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="lastWeek">Last Week</option>
+                            <option value="lastMonth">Last Month</option>
+                            <option value="lastYear">Last Year</option>
+                            <option value="custom">Date Range</option>
+                        </select>
+                        
+                        <select id="reportStatusFilter" onchange="applyStatusFilter()" style="padding: 10px; border: 2px solid #dfe6e9; border-radius: 8px;">
+                            <option value="ALL">All Status</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="INPROGRESS">In Progress</option>
+                            <option value="UPCOMING">Upcoming</option>
+                            <option value="POSTPONED">Postponed</option>
+                            <option value="REJECTED">Rejected</option>
+                            <option value="REFUND">Refund</option>
+                        </select>
+                        
+                        <div id="customDateRange" style="display: none; gap: 10px;">
+                            <input type="date" id="reportFromDate" style="padding: 10px; border: 2px solid #dfe6e9; border-radius: 8px;">
+                            <span>to</span>
+                            <input type="date" id="reportToDate" style="padding: 10px; border: 2px solid #dfe6e9; border-radius: 8px;">
+                            <button onclick="applyDateFilter()" class="preview-btn" style="padding: 10px 20px;">Apply</button>
+                        </div>
+                        
+                        <button onclick="downloadExcelReport()" class="submit-btn" style="margin-left: auto;">
+                            <i class="fas fa-file-excel"></i> Download Excel
+                        </button>
+                    </div>
+                </div>
+
+                    <!-- Stats Cards -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <i class="fas fa-calendar-check"></i>
+                            <h4>Total Weddings</h4>
+                            <p id="filteredWeddings">0</p>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #00b894;">
+                            <i class="fas fa-rupee-sign" style="color: #00b894;"></i>
+                            <h4>Total Income Received</h4>
+                            <p id="filteredIncome" style="color: #00b894;">₹0</p>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #e74c3c;">
+                            <i class="fas fa-shopping-cart" style="color: #e74c3c;"></i>
+                            <h4>Total Expenses</h4>
+                            <p id="filteredExpenses" style="color: #e74c3c;">₹0</p>
+                        </div>
+                        <!-- <div class="stat-card" style="border-left: 4px solid #d63031;">
+                            <i class="fas fa-exclamation-circle" style="color: #d63031;"></i>
+                            <h4>Total Pending</h4>
+                            <p id="filteredPending" style="color: #d63031;">₹0</p>
+                        </div> -->
+                        <div class="stat-card" style="border-left: 4px solid #f39c12;">
+                            <i class="fas fa-piggy-bank" style="color: #f39c12;"></i>
+                            <h4>Overall Profit</h4>
+                            <p id="filteredProfit" style="color: #f39c12;">₹0</p>
+                        </div>
+                    </div>
+
+                    <!-- Report Table -->
+                    <div class="report-table-section">
+                        <h4 style="margin-bottom: 15px;"><i class="fas fa-table"></i> Detailed Report</h4>
+                        <div class="table-responsive">
+                            <table class="bookings-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Marriage Date</th>
+                                        <th>Income</th>
+                                        <th>Expenses</th>
+                                        <th>Pending</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="reportPaginationControls" style="padding: 20px; display: flex; justify-content: center; gap: 5px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 0 20px 20px;">
+                            <label>Rows per page:</label>
+                            <input type="number" id="reportRowsPerPage" value="5" min="1" max="50" 
+                                onchange="reportRowsPerPage = parseInt(this.value); reportCurrentPage = 1; renderReportTable();"
+                                style="padding: 8px; width: 60px; border: 1px solid #ccc; border-radius: 5px; text-align: center;">
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="charts-section">
+                        <h4 style="margin-bottom: 20px;"><i class="fas fa-chart-pie"></i> Analytics Charts</h4>
+                        
+                        <div class="charts-grid">
+                            <div class="chart-card">
+                                <h5>📊 Income vs Expense vs Profit</h5>
+                                <canvas id="barChart"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <h5>🥧 Income Breakdown</h5>
+                                <canvas id="pieChart"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <h5>🥧 Expense Breakdown</h5>
+                                <canvas id="doughnutChart"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <h5>📈 Monthly Growth</h5>
+                                <canvas id="lineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="showDashboard()" class="btn-secondary" style="margin-top: 30px; width: 100%;">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Booking Form Section -->
     <section class="booking-section" id="bookingSection">
         <div class="container">
             <div class="form-card">
@@ -136,6 +342,19 @@
                                 <label>Amount Given By *</label>
                                 <input type="text" id="amountGivenBy" required minlength="3">
                                 <small class="error-text" id="amountGivenByError"></small>
+                            </div>
+                            
+                            <!-- Status Dropdown (only visible in edit mode) -->
+                            <div class="form-group" id="statusGroup" style="display: none;">
+                                <label>Booking Status</label>
+                                <select id="bookingStatus" style="padding: 12px 15px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                    <option value="UPCOMING">Upcoming</option>
+                                    <option value="INPROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                    <option value="POSTPONED">Postponed</option>
+                                    <option value="REJECTED">Rejected</option>
+                                    <option value="REFUND">Refund</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -202,15 +421,25 @@
                                 </div>
                                 <input type="number" id="sapaduIlaiAmount" value="3000" min="0" step="100" class="fee-input">
                             </div>
+                            
+                            <div class="service-card">
+                                <div class="chk-group">
+                                    <input type="checkbox" id="waterCan">
+                                    <label for="waterCan">Water Can</label>
+                                </div>
+                                <input type="number" id="waterCanAmount" value="500" min="0" step="50" class="fee-input">
+                            </div>
 
                             <div class="service-card full-width">
                                 <div class="chk-group">
                                     <input type="checkbox" id="others">
                                     <label for="others">Others</label>
                                 </div>
-                                <div id="othersFields" style="display: none; width: 100%; margin-top: 10px; gap: 10px;" class="others-flex">
-                                    <input type="text" id="otherTitle"  class="fee-input" placeholder="Service Name" style="flex: 2;">
-                                    <input type="number" id="otherAmount"  class="fee-input" value="0" min="0" step="100" placeholder="Amount" style="flex: 1;">
+                                <div id="othersFields" style="display: none; width: 100%; margin-top: 10px;">
+                                    <div id="othersContainer"></div>
+                                    <button type="button" class="add-other-btn" onclick="addOtherService()">
+                                        <i class="fas fa-plus"></i> Add Service
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -241,6 +470,71 @@
             </div>
         </div>
     </section>
+
+    <!-- Expense Modal -->
+    <div id="expenseModal" class="modal">
+        <div class="modal-box" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0;"><i class="fas fa-money-bill-wave"></i> Manage Expenses</h3>
+                <button onclick="closeModal('expenseModal')" class="close-preview" style="background: none; border: none; font-size: 28px; cursor: pointer;">×</button>
+            </div>
+
+            <div id="expenseForm">
+                <input type="hidden" id="expenseEventId">
+                
+                <div class="expense-item">
+                    <label>💼 Staff Salary</label>
+                    <input type="number" id="exp_staffSalary" value="0" min="0" step="100" class="fee-input">
+                </div>
+
+                <div class="expense-item">
+                    <label>🍃 Ilai Eduthal & Cleaning</label>
+                    <input type="number" id="exp_ilaiCleaning" value="0" min="0" step="100" class="fee-input">
+                </div>
+
+                <div class="expense-item">
+                    <label>⚡ Current Bill</label>
+                    <input type="number" id="exp_currentBill" value="0" min="0" step="100" class="fee-input">
+                </div>
+
+                <div class="expense-item">
+                    <label>🛒 Purchase Things</label>
+                    <input type="number" id="exp_purchase" value="0" min="0" step="100" class="fee-input">
+                </div>
+
+                <div class="expense-item">
+                    <label>🔧 Damage Recover</label>
+                    <input type="number" id="exp_damage" value="0" min="0" step="100" class="fee-input">
+                </div>
+
+                <div class="expense-item">
+                    <label>🏗️ New Development</label>
+                    <input type="number" id="exp_development" value="0" min="0" step="100" class="fee-input">
+                </div>
+
+                <div class="expense-item">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <input type="checkbox" id="showOthers" onchange="toggleOtherExpenses()">
+                        <label for="showOthers" style="margin: 0; cursor: pointer;">Add Other Expenses</label>
+                    </div>
+                    <div id="otherExpensesContainer" style="display: none;">
+                        <div id="otherExpensesList"></div>
+                        <button type="button" onclick="addOtherExpense()" class="preview-btn" style="margin-top: 10px; padding: 8px 15px;">
+                            <i class="fas fa-plus"></i> Add More
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <strong>Total Expenses: ₹<span id="totalExpensesDisplay">0</span></strong>
+                </div>
+
+                <button onclick="updateExpenses()" class="submit-btn" style="width: 100%; margin-top: 20px;">
+                    <i class="fas fa-save"></i> Update Expenses
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- PDF Template -->
     <div id="pdf-container-wrapper">
