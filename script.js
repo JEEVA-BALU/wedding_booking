@@ -150,11 +150,6 @@ function validateName() {
         return false;
     }
 
-    if (!name.match(/^[a-zA-Z\s.]+$/)) {
-        showError('marriagePersonName', 'marriagePersonNameError', 'Name can only contain letters and spaces');
-        return false;
-    }
-
     hideError('marriagePersonName', 'marriagePersonNameError');
     return true;
 }
@@ -587,7 +582,7 @@ async function addToCalendar() {
 
     const desc = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       KAVERI WEDDING HALL BOOKING
+       CAUVERY WEDDING HALL BOOKING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👤 CUSTOMER DETAILS:
@@ -626,7 +621,7 @@ ${servicesText.length > 0 ? servicesText.join('\n') : 'No additional services se
     const event = {
         'summary': `Marriage - ${name}`,
         'description': desc,
-        'location': 'Kaveri Wedding Hall, Tamil Nadu',
+        'location': 'Cauvery Wedding Hall, Tamil Nadu',
         'start': {
             'dateTime': new Date(getTxt('fromDateTime')).toISOString(),
             'timeZone': 'Asia/Kolkata'
@@ -669,7 +664,7 @@ async function updateCalendarEvent(eventId) {
 
     const desc = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       KAVERI WEDDING HALL BOOKING
+       CAUVERY WEDDING HALL BOOKING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👤 CUSTOMER DETAILS:
@@ -708,7 +703,7 @@ ${servicesText.length > 0 ? servicesText.join('\n') : 'No additional services se
     const event = {
         'summary': `Marriage - ${name}`,
         'description': desc,
-        'location': 'Kaveri Wedding Hall, Tamil Nadu',
+        'location': 'Cauvery Wedding Hall, Tamil Nadu',
         'start': {
             'dateTime': new Date(getTxt('fromDateTime')).toISOString(),
             'timeZone': 'Asia/Kolkata'
@@ -1065,6 +1060,7 @@ function cancelEdit() {
     // 5. Reset Defaults
     setDefaultDate();
     calculateTotal();
+    showDashboard();
 }
 
 async function deleteBooking(eventId) {
@@ -1174,10 +1170,10 @@ function generatePDF() {
 
             // Generate PDF with optimized settings
             const element = document.getElementById('pdf-template');
-            const fileName = `Kaveri_Booking_${document.getElementById('marriagePersonName').value}.pdf`;
+            const fileName = `Cauvery_Booking_${document.getElementById('marriagePersonName').value}.pdf`;
             const opt = {
                 margin: [10, 10, 10, 10],
-                filename: `Kaveri_Wedding_Booking_${getTxt('marriagePersonName').replace(/\s+/g, '_')}.pdf`,
+                filename: `Cauvery_Wedding_Booking_${getTxt('marriagePersonName').replace(/\s+/g, '_')}.pdf`,
                 image: { 
                     type: 'jpeg', 
                     quality: 1 
@@ -1286,6 +1282,7 @@ function openWhatsApp() {
     const mobile = document.getElementById('mobileNumber').value;
     const name = document.getElementById('marriagePersonName').value;
     const date = document.getElementById('marriageDate').value;
+    mobile = '91' + mobile;
     
     // Format Date for message
     const dateObj = new Date(date);
@@ -1293,7 +1290,7 @@ function openWhatsApp() {
 
     // 2. Build the Message (Use %0a for new lines)
     // We use encodeURIComponent to ensure special characters don't break the link
-    let message = `*KAVERI WEDDING HALL - BOOKING CONFIRMATION* %0a`;
+    let message = `*CAUVERY WEDDING HALL - BOOKING CONFIRMATION* %0a`;
     message += `--------------------------------%0a`;
     message += `📅 *Date:* ${dateStr}%0a`;
     message += `👤 *Name:* ${name}%0a`;
@@ -1308,7 +1305,10 @@ function openWhatsApp() {
 
     // 3. Open WhatsApp
     // '91' is added for India country code
-    const url = `https://wa.me/91${mobile}?text=${message}`;
+    const encodedMessage = encodeURIComponent(message);
+
+    // 4. Open WhatsApp
+    const url = `https://wa.me/${mobile}?text=${encodedMessage}`;
     window.open(url, '_blank');
 }
 
