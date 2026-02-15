@@ -54,7 +54,7 @@
                     <i class="fas fa-plus"></i> New Booking
                 </button>
                 
-                <div style="position: relative;">
+                <div style="position: relative;" class="google-mail">
                     <button id="googleSignInBtn" class="submit-btn disabled" disabled>
                         <i class="fas fa-spinner fa-spin" id="btnLoader"></i>
                         <span id="btnText">Initializing...</span>
@@ -76,7 +76,7 @@
                 <div class="dashboard-controls" style="padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; align-items: center;">
     
                     <div style="flex-grow: 1;">
-                        <input type="text" id="searchInput" placeholder="Search customer name..." 
+                        <input type="text" id="searchInput" placeholder="Search name, city, or date (e.g., 17 Feb)..." 
                             style="padding: 10px; width: 100%; max-width: 300px; border: 1px solid #ccc; border-radius: 5px;">
                     </div>
 
@@ -216,11 +216,11 @@
                             <h4>Total Expenses</h4>
                             <p id="filteredExpenses" style="color: #e74c3c;">₹0</p>
                         </div>
-                        <!-- <div class="stat-card" style="border-left: 4px solid #d63031;">
-                            <i class="fas fa-exclamation-circle" style="color: #d63031;"></i>
-                            <h4>Total Pending</h4>
-                            <p id="filteredPending" style="color: #d63031;">₹0</p>
-                        </div> -->
+                        <div class="stat-card" style="border-left: 4px solid #fdcb6e;">
+                                <i class="fas fa-clock" style="color: #fdcb6e;"></i>
+                                <h4>Total Pending</h4>
+                                <p id="filteredPending" style="color: #fdcb6e;">₹0</p>
+                            </div>
                         <div class="stat-card" style="border-left: 4px solid #f39c12;">
                             <i class="fas fa-piggy-bank" style="color: #f39c12;"></i>
                             <h4>Overall Profit</h4>
@@ -238,8 +238,8 @@
                                         <th>Name</th>
                                         <th>Marriage Date</th>
                                         <th>Income</th>
-                                        <th>Expenses</th>
                                         <th>Pending</th>
+                                        <th>Expenses</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
@@ -300,6 +300,7 @@
 
                 <form id="bookingForm" novalidate>
                     <input type="hidden" id="editEventId" value="">
+                    
                     <div class="form-section">
                         <h4 class="section-title"><i class="fas fa-info-circle"></i> Basic Details</h4>
                         <div class="form-grid">
@@ -330,24 +331,23 @@
                             </div>
                             <div class="form-group">
                                 <label>Mobile Number (10 Digits) *</label>
-                                <input type="tel" id="mobileNumber" maxlength="10" placeholder="9944XXXXXX" required pattern="[0-9]{10}">
+                                <input type="tel" id="mobileNumber" maxlength="10" placeholder="9944XXXXXX" required>
                                 <small class="error-text" id="mobileError"></small>
                             </div>
                             <div class="form-group">
                                 <label>Customer City *</label>
-                                <input type="text" id="customerFrom" required minlength="2">
+                                <input type="text" id="customerFrom" required>
                                 <small class="error-text" id="customerFromError"></small>
                             </div>
                             <div class="form-group">
                                 <label>Amount Given By *</label>
-                                <input type="text" id="amountGivenBy" required minlength="3">
+                                <input type="text" id="amountGivenBy" required>
                                 <small class="error-text" id="amountGivenByError"></small>
                             </div>
                             
-                            <!-- Status Dropdown (only visible in edit mode) -->
                             <div class="form-group" id="statusGroup" style="display: none;">
                                 <label>Booking Status</label>
-                                <select id="bookingStatus" style="padding: 12px 15px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                <select id="bookingStatus" style="padding: 12px; border: 2px solid var(--border); border-radius: 8px;">
                                     <option value="UPCOMING">Upcoming</option>
                                     <option value="INPROGRESS">In Progress</option>
                                     <option value="COMPLETED">Completed</option>
@@ -360,11 +360,11 @@
                     </div>
 
                     <div class="form-section bg-highlight">
-                        <h4 class="section-title"><i class="fas fa-rupee-sign"></i> Payment Details</h4>
+                        <h4 class="section-title"><i class="fas fa-rupee-sign"></i> Hall Payment Details</h4>
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Total Hall Amount *</label>
-                                <input type="number" id="totalHallAmount" value="22000" min="1000" step="500" required>
+                                <input type="number" id="totalHallAmount" value="22000" min="0" step="500" required>
                                 <small class="error-text" id="totalHallAmountError"></small>
                             </div>
                             <div class="form-group">
@@ -373,8 +373,16 @@
                                 <small class="error-text" id="advanceAmountError"></small>
                             </div>
                             <div class="form-group">
-                                <label>Pending Amount (Auto)</label>
+                                <label style="color: #d63031;">Pending Hall Amount</label>
                                 <input type="number" id="pendingAmount" readonly class="readonly-field">
+                            </div>
+                            <div class="form-group" style="justify-content: flex-end;">
+                                <div class="chk-group" style="background: #e0f7fa; padding: 10px; border-radius: 8px; border: 1px solid #00cec9;">
+                                    <input type="checkbox" id="hallSettled">
+                                    <label for="hallSettled" style="color: #00b894; font-weight: bold; cursor:pointer;">
+                                        <i class="fas fa-check-circle"></i> Hall Payment Settled
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -383,63 +391,57 @@
                         <h4 class="section-title"><i class="fas fa-concierge-bell"></i> Additional Services</h4>
                         <div class="services-grid">
                             <div class="service-card">
-                                <div class="chk-group">
-                                    <input type="checkbox" id="cleaningFee" checked>
-                                    <label for="cleaningFee">Cleaning Fee</label>
-                                </div>
-                                <input type="number" id="cleaningFeeAmount" value="1500" min="0" step="100" class="fee-input">
+                                <div class="chk-group"><input type="checkbox" id="cleaningFee" checked><label for="cleaningFee">Cleaning Fee</label></div>
+                                <input type="number" id="cleaningFeeAmount" value="1500" class="fee-input">
                             </div>
-
                             <div class="service-card">
-                                <div class="chk-group">
-                                    <input type="checkbox" id="acRooms">
-                                    <label for="acRooms">AC Rooms</label>
-                                </div>
-                                <input type="number" id="acRoomsAmount" value="2000" min="0" step="100" class="fee-input">
+                                <div class="chk-group"><input type="checkbox" id="acRooms"><label for="acRooms">AC Rooms</label></div>
+                                <input type="number" id="acRoomsAmount" value="2000" class="fee-input">
                             </div>
-
                             <div class="service-card">
-                                <div class="chk-group">
-                                    <input type="checkbox" id="serialLights">
-                                    <label for="serialLights">Serial Lights</label>
-                                </div>
-                                <input type="number" id="serialLightsAmount" value="2500" min="0" step="100" class="fee-input">
+                                <div class="chk-group"><input type="checkbox" id="serialLights"><label for="serialLights">Serial Lights</label></div>
+                                <input type="number" id="serialLightsAmount" value="2500" class="fee-input">
                             </div>
-
                             <div class="service-card">
-                                <div class="chk-group">
-                                    <input type="checkbox" id="speaker">
-                                    <label for="speaker">Speaker</label>
-                                </div>
-                                <input type="number" id="speakerAmount" value="1500" min="0" step="100" class="fee-input">
+                                <div class="chk-group"><input type="checkbox" id="speaker"><label for="speaker">Speaker</label></div>
+                                <input type="number" id="speakerAmount" value="1500" class="fee-input">
                             </div>
-
                             <div class="service-card">
-                                <div class="chk-group">
-                                    <input type="checkbox" id="sapaduIlai" checked>
-                                    <label for="sapaduIlai">Sapadu Ilai</label>
-                                </div>
-                                <input type="number" id="sapaduIlaiAmount" value="3000" min="0" step="100" class="fee-input">
+                                <div class="chk-group"><input type="checkbox" id="sapaduIlai" checked><label for="sapaduIlai">Sapadu Ilai</label></div>
+                                <input type="number" id="sapaduIlaiAmount" value="3000" class="fee-input">
                             </div>
-                            
                             <div class="service-card">
-                                <div class="chk-group">
-                                    <input type="checkbox" id="waterCan">
-                                    <label for="waterCan">Water Can</label>
-                                </div>
-                                <input type="number" id="waterCanAmount" value="500" min="0" step="50" class="fee-input">
+                                <div class="chk-group"><input type="checkbox" id="waterCan"><label for="waterCan">Water Can</label></div>
+                                <input type="number" id="waterCanAmount" value="500" class="fee-input">
                             </div>
 
                             <div class="service-card full-width">
-                                <div class="chk-group">
-                                    <input type="checkbox" id="others">
-                                    <label for="others">Others</label>
-                                </div>
+                                <div class="chk-group"><input type="checkbox" id="others"><label for="others">Others</label></div>
                                 <div id="othersFields" style="display: none; width: 100%; margin-top: 10px;">
                                     <div id="othersContainer"></div>
-                                    <button type="button" class="add-other-btn" onclick="addOtherService()">
-                                        <i class="fas fa-plus"></i> Add Service
-                                    </button>
+                                    <button type="button" class="add-other-btn" onclick="addOtherService()">+ Add Service</button>
+                                </div>
+                            </div>
+
+                            <div class="service-card full-width" style="background: #fff8e1; border-color: #ffeaa7;">
+                                <h5 style="margin-bottom: 15px; color: #d35400;">Addons Summary</h5>
+                                <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 13px; font-weight: 600;">Total Addons Amount (Editable)</label>
+                                        <input type="number" id="totalAddonsAmount" value="0" class="fee-input" style="background: white; font-weight: bold;">
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 13px; font-weight: 600; color: #d63031;">Pending Addons Amount</label>
+                                        <input type="number" id="pendingAddonsAmount" value="0" class="fee-input" style="background: white; color: #d63031; font-weight: bold;">
+                                    </div>
+                                    <div style="padding-bottom: 5px;">
+                                        <div class="chk-group" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #00cec9;">
+                                            <input type="checkbox" id="addonsSettled">
+                                            <label for="addonsSettled" style="color: #00b894; font-weight: bold; cursor: pointer;">
+                                                <i class="fas fa-check-circle"></i> Addons Settled
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -447,23 +449,13 @@
 
                     <div class="form-actions sticky-footer">
                         <div class="total-display">
-                            <span>Final Total:</span>
+                            <span>Total Bill Value (Hall + Addons):</span>
                             <h2 id="displayFinal">₹ 0</h2>
                         </div>
                         <div class="button-group">
-                            <button type="button" id="cancelEditBtn" class="preview-btn" style="background:#636e72; display:none;" onclick="cancelEdit()">
-                                Cancel
-                            </button>
-                            
-                            <button type="button" id="previewPdfBtn" class="preview-btn">
-                                <i class="fas fa-eye"></i>
-                                Preview PDF
-                            </button>
-                            
-                            <button type="submit" id="submitBtn" class="submit-btn">
-                                <i class="fas fa-check-circle"></i>
-                                Confirm & Download
-                            </button>
+                            <button type="button" id="cancelEditBtn" class="preview-btn" style="background:#636e72; display:none;" onclick="cancelEdit()">Cancel</button>
+                            <button type="button" id="previewPdfBtn" class="preview-btn"><i class="fas fa-eye"></i> Preview</button>
+                            <button type="submit" id="submitBtn" class="submit-btn"><i class="fas fa-check-circle"></i> Confirm</button>
                         </div>
                     </div>
                 </form>
