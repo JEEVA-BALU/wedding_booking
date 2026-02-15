@@ -237,6 +237,35 @@ function setupListeners() {
         }
         calculateTotal();
     });
+    document.getElementById('totalAddonsAmount').addEventListener('input', () => {
+        // Just update final display, don't overwrite checkboxes logic
+        const hall = parseFloat(document.getElementById('totalHallAmount').value) || 0;
+        const addons = parseFloat(document.getElementById('totalAddonsAmount').value) || 0;
+        document.getElementById('displayFinal').innerText = `₹ ${(hall + addons).toLocaleString('en-IN')}`;
+    });
+    document.getElementById('pendingAddonsAmount').addEventListener('input', function() {
+        // 1. Get the current values
+        const manualPending = parseFloat(this.value) || 0;
+        const hallPending = parseFloat(document.getElementById('pendingAmount').value) || 0;
+        
+        // 2. Update the global bookingData object immediately
+        // This ensures the correct value is used when you click "Confirm" or "Preview"
+        if (typeof bookingData !== 'undefined') {
+            bookingData.pendingAddons = manualPending;
+            bookingData.totalPending = hallPending + manualPending;
+            
+            // Update the "Settled" status in the data object
+            bookingData.addonsSettled = (manualPending === 0);
+        }
+
+        // 3. UX Feature: Auto-toggle the "Settled" checkbox
+        const settledChk = document.getElementById('addonsSettled');
+        if (manualPending === 0) {
+            settledChk.checked = true;
+        } else {
+            settledChk.checked = false;
+        }
+    });
 
     document.getElementById('mobileNumber').addEventListener('input', validateMobile);
     document.getElementById('marriagePersonName').addEventListener('input', validateName);
@@ -252,6 +281,8 @@ function setupListeners() {
     document.getElementById('bookingForm').addEventListener('submit', handleFormSubmit);
     document.getElementById('previewPdfBtn').addEventListener('click', handlePreviewPDF);
     document.getElementById('googleSignInBtn').addEventListener('click', handleAuthClick);
+    document.getElementById('hallSettled').addEventListener('change', calculateTotal);
+    document.getElementById('addonsSettled').addEventListener('change', calculateTotal);
     
     setupExpenseListeners();
 }
@@ -296,21 +327,34 @@ function removeOtherService(id) {
 }
 
 /* VALIDATION FUNCTIONS */
+/* VALIDATION FUNCTIONS (Updated for Safety) */
 function showError(inputId, errorId, message) {
     const input = document.getElementById(inputId);
     const error = document.getElementById(errorId);
-    input.classList.add('invalid');
-    input.classList.remove('valid');
-    error.textContent = message;
-    error.classList.add('show');
+    
+    if (input) {
+        input.classList.add('invalid');
+        input.classList.remove('valid');
+    }
+    
+    if (error) {
+        error.textContent = message;
+        error.classList.add('show');
+    }
 }
 
 function hideError(inputId, errorId) {
     const input = document.getElementById(inputId);
     const error = document.getElementById(errorId);
-    input.classList.remove('invalid');
-    input.classList.add('valid');
-    error.classList.remove('show');
+    
+    if (input) {
+        input.classList.remove('invalid');
+        input.classList.add('valid');
+    }
+    
+    if (error) {
+        error.classList.remove('show');
+    }
 }
 
 function validateMobile() {
@@ -431,10 +475,10 @@ function validateMarriageDate() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (selectedDate < today) {
-        showError('marriageDate', 'marriageDateError', 'Marriage date cannot be in the past');
-        return false;
-    }
+    // if (selectedDate < today) {
+    //     showError('marriageDate', 'marriageDateError', 'Marriage date cannot be in the past');
+    //     return false;
+    // }
 
     hideError('marriageDate', 'marriageDateError');
     return true;
@@ -504,47 +548,84 @@ function validateAllFields() {
 
 /* CALCULATION LOGIC */
 function calculateTotal() {
-    const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
-    const isChecked = (id) => document.getElementById(id).checked;
-
+    const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? (parseFloat(el.value) || 0) : 0;
+    };
+    const isChecked = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.checked : false;
+    };
+    
+    // --- 1. Hall Rent Calculation ---
     const totalHall = getVal('totalHallAmount');
     const advance = getVal('advanceAmount');
-    const pending = Math.max(0, totalHall - advance);
-
-    document.getElementById('pendingAmount').value = pending;
-
-    let extras = 0;
-    if(isChecked('cleaningFee')) extras += getVal('cleaningFeeAmount');
-    if(isChecked('acRooms')) extras += getVal('acRoomsAmount');
-    if(isChecked('serialLights')) extras += getVal('serialLightsAmount');
-    if(isChecked('speaker')) extras += getVal('speakerAmount');
-    if(isChecked('sapaduIlai')) extras += getVal('sapaduIlaiAmount');
-    if(isChecked('waterCan')) extras += getVal('waterCanAmount');
+    const hallSettled = isChecked('hallSettled');
     
-    const otherServices = [];
+    const pendingHall = hallSettled ? 0 : Math.max(0, totalHall - advance);
+    if(document.getElementById('pendingAmount')) {
+        document.getElementById('pendingAmount').value = pendingHall;
+    }
+
+    // --- 2. Addons Calculation ---
+    let calculatedAddons = 0;
+    if(isChecked('cleaningFee')) calculatedAddons += getVal('cleaningFeeAmount');
+    if(isChecked('acRooms')) calculatedAddons += getVal('acRoomsAmount');
+    if(isChecked('serialLights')) calculatedAddons += getVal('serialLightsAmount');
+    if(isChecked('speaker')) calculatedAddons += getVal('speakerAmount');
+    if(isChecked('sapaduIlai')) calculatedAddons += getVal('sapaduIlaiAmount');
+    if(isChecked('waterCan')) calculatedAddons += getVal('waterCanAmount');
+    
+    // Check Others - SAFELY
+    const othersList = [];
     if(isChecked('others')) {
         for (let i = 1; i <= otherServiceCount; i++) {
-            const titleEl = document.getElementById(`other_title_${i}`);
             const amountEl = document.getElementById(`other_amount_${i}`);
-            if (titleEl && amountEl && amountEl.value > 0) {
+            const titleEl = document.getElementById(`other_title_${i}`);
+            
+            // Only add if element actually exists
+            if (amountEl && titleEl) {
                 const amt = parseFloat(amountEl.value) || 0;
-                extras += amt;
-                otherServices.push({
-                    title: titleEl.value,
-                    amount: amt
-                });
+                calculatedAddons += amt;
+                othersList.push({ title: titleEl.value, amount: amt });
             }
         }
     }
 
-    const finalTotal = pending + extras;
-    document.getElementById('displayFinal').innerText = `₹ ${finalTotal.toLocaleString('en-IN')}`;
+    const currentTotalAddonsInput = document.getElementById('totalAddonsAmount');
+    currentTotalAddonsInput.value = calculatedAddons;
 
+    const addonsSettled = isChecked('addonsSettled');
+    const pendingAddonsInput = document.getElementById('pendingAddonsAmount');
+    
+    if (addonsSettled) {
+        pendingAddonsInput.value = 0;
+        pendingAddonsInput.disabled = true; 
+    } else {
+        pendingAddonsInput.disabled = false;
+        pendingAddonsInput.value = calculatedAddons;
+    }
+    
+    const pendingAddons = parseFloat(pendingAddonsInput.value) || 0;
+    const totalAddons = parseFloat(currentTotalAddonsInput.value) || 0;
+
+    // --- 3. Final Display ---
+    const finalTotalBill = totalHall + totalAddons;
+    const finalTotalPending = pendingHall + pendingAddons;
+
+    document.getElementById('displayFinal').innerText = `₹ ${finalTotalBill.toLocaleString('en-IN')}`;
+    
+    // Store in global object
     bookingData = {
-        totalHall, 
-        advance, 
-        pending, 
-        finalTotal,
+        totalHall,
+        advance,
+        pendingHall,
+        totalAddons,
+        pendingAddons,
+        finalTotal: finalTotalBill,
+        totalPending: finalTotalPending,
+        hallSettled,
+        addonsSettled,
         fees: {
             cleaning: isChecked('cleaningFee') ? getVal('cleaningFeeAmount') : 0,
             ac: isChecked('acRooms') ? getVal('acRoomsAmount') : 0,
@@ -552,7 +633,7 @@ function calculateTotal() {
             speaker: isChecked('speaker') ? getVal('speakerAmount') : 0,
             ilai: isChecked('sapaduIlai') ? getVal('sapaduIlaiAmount') : 0,
             waterCan: isChecked('waterCan') ? getVal('waterCanAmount') : 0,
-            others: otherServices
+            others: othersList
         }
     };
 }
@@ -657,71 +738,211 @@ function renderNotifications() {
         container.innerHTML = `
             <div class="notification-empty">
                 <i class="fas fa-check-circle"></i>
-                <p>No new notifications</p>
+                <p>No pending notifications</p>
             </div>
         `;
         return;
     }
     
-    notifications.sort((a, b) => {
-        if (a.type !== b.type) {
-            return a.type === 'reminder' ? -1 : 1;
-        }
-        return a.date - b.date;
-    });
+    notifications.sort((a, b) => a.date - b.date);
     
     container.innerHTML = '';
     
-    notifications.forEach(notification => {
+    notifications.forEach(n => {
         const div = document.createElement('div');
-        div.className = `notification-item ${notification.type}`;
+        div.className = `notification-item ${n.type}`;
         
-        if (notification.type === 'reminder') {
+        // Common Date Format
+        const dateStr = n.date.toLocaleDateString('ta-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+        
+        if (n.type === 'reminder') {
             div.innerHTML = `
-                <div class="notification-title">
-                    🔔 திருமண நினைவூட்டல்
-                </div>
+                <div class="notification-title">🔔 திருமண நினைவூட்டல்</div>
                 <div class="notification-message">
-                    <strong>${notification.name}</strong> அவர்களின் திருமணம் <strong>${notification.daysText}</strong> நடைபெற உள்ளது
+                    <strong>${n.name}</strong> அவர்களின் திருமணம் <strong>${n.daysText}</strong> நடைபெற உள்ளது
                 </div>
-                <div class="notification-date">
-                    📅 ${notification.date.toLocaleDateString('ta-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </div>
+                <div class="notification-date">📅 ${dateStr}</div>
                 <div class="notification-actions">
-                    <button class="notification-btn-action whatsapp" onclick="sendReminderWhatsApp('${notification.id}', '${notification.name}', '${notification.mobile}', '${notification.date.toISOString()}', '${notification.daysText}')">
+                    <button class="notification-btn-action whatsapp" 
+                        onclick="sendReminderWhatsApp('${n.eventId}', '${n.name}', '${n.mobile}', '${n.date.toISOString()}', '${n.daysText}', '${n.flag}')">
                         <i class="fab fa-whatsapp"></i> Send Reminder
                     </button>
-                    <button class="notification-btn-action dismiss" onclick="dismissNotification('${notification.id}')">
-                        <i class="fas fa-times"></i> Dismiss
+                    <button class="notification-btn-action dismiss" 
+                        onclick="handleNotificationDismiss('${n.eventId}', '${n.flag}')">
+                        <i class="fas fa-check"></i> Mark Done
                     </button>
                 </div>
             `;
         } else {
             div.innerHTML = `
-                <div class="notification-title">
-                    🙏 நன்றி செய்தி
-                </div>
+                <div class="notification-title">🙏 நன்றி செய்தி</div>
                 <div class="notification-message">
-                    <strong>${notification.name}</strong> அவர்களின் திருமணம் <strong>${notification.daysText}</strong> நடைபெற்றது
+                    <strong>${n.name}</strong> அவர்களின் திருமணம் <strong>${n.daysText}</strong> நடைபெற்றது
                 </div>
-                <div class="notification-date">
-                    📅 ${notification.date.toLocaleDateString('ta-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </div>
+                <div class="notification-date">📅 ${dateStr}</div>
                 <div class="notification-actions">
-                    <button class="notification-btn-action whatsapp" onclick="sendThankYouWhatsApp('${notification.id}', '${notification.name}', '${notification.mobile}')">
+                    <button class="notification-btn-action whatsapp" 
+                        onclick="sendThankYouWhatsApp('${n.eventId}', '${n.name}', '${n.mobile}', '${n.flag}')">
                         <i class="fab fa-whatsapp"></i> Send Thank You
                     </button>
-                    <button class="notification-btn-action dismiss" onclick="dismissNotification('${notification.id}')">
-                        <i class="fas fa-times"></i> Dismiss
+                    <button class="notification-btn-action dismiss" 
+                        onclick="handleNotificationDismiss('${n.eventId}', '${n.flag}')">
+                        <i class="fas fa-check"></i> Mark Done
                     </button>
                 </div>
             `;
         }
-        
         container.appendChild(div);
     });
 }
 
+/* --- NEW FUNCTION: Mark Notification as Done in Calendar --- */
+async function markNotificationAsDone(eventId, flag) {
+    // Show a small loading indicator or just process in background
+    console.log(`Marking event ${eventId} as ${flag}...`);
+    
+    try {
+        // 1. Get current event to ensure we don't overwrite other data
+        const response = await gapi.client.calendar.events.get({
+            'calendarId': 'primary',
+            'eventId': eventId
+        });
+        const event = response.result;
+        
+        let desc = event.description || "";
+        
+        // 2. Prevent duplicate flags
+        if (!desc.includes(flag)) {
+            event.description = desc + "\n" + flag;
+            
+            // 3. Update Calendar
+            await gapi.client.calendar.events.update({
+                'calendarId': 'primary',
+                'eventId': eventId,
+                'resource': event
+            });
+            console.log("Calendar updated successfully.");
+        }
+        
+        // 4. Refresh list to remove the notification immediately
+        loadNotifications();
+        
+    } catch (error) {
+        console.error("Error updating notification status:", error);
+        showAlert('Error', 'Could not update reminder status in Calendar.');
+    }
+}
+
+async function loadNotifications() {
+    if (!gapiInited || !gapi.client.getToken()) {
+        document.getElementById('notificationList').innerHTML = `
+            <div class="notification-empty">
+                <i class="fas fa-bell-slash"></i>
+                <p>Please sign in to view notifications</p>
+            </div>
+        `;
+        return;
+    }
+    
+    try {
+        const now = new Date();
+        const twoDaysAgo = new Date(now.getTime() - (2 * 24 * 60 * 60 * 1000));
+        const twoDaysAhead = new Date(now.getTime() + (3 * 24 * 60 * 60 * 1000)); // Increased range slightly
+        
+        const response = await gapi.client.calendar.events.list({
+            'calendarId': 'primary',
+            'timeMin': twoDaysAgo.toISOString(),
+            'timeMax': twoDaysAhead.toISOString(),
+            'showDeleted': false,
+            'singleEvents': true,
+            'orderBy': 'startTime'
+        });
+        
+        const events = response.result.items;
+        notifications = [];
+        
+        events.forEach(event => {
+            if (!event.summary || !event.summary.includes('Marriage')) return;
+            
+            const eventDate = new Date(event.start.dateTime || event.start.date);
+            const diffDays = Math.floor((eventDate - now) / (1000 * 60 * 60 * 24));
+            
+            const desc = event.description || '';
+            const nameMatch = event.summary.match(/Marriage - (.+)/);
+            const mobileMatch = desc.match(/Mobile Number: (\d+)/);
+            
+            const name = nameMatch ? nameMatch[1] : 'Customer';
+            const mobile = mobileMatch ? mobileMatch[1] : null;
+            const notificationId = `${event.id}_${diffDays}`;
+            
+            // --- LOGIC: Check Description Flags ---
+            
+            // 1. Before 2 Days
+            if (diffDays === 2) {
+                if (desc.includes("before 2 day reminder done")) return; // Skip if done
+                
+                notifications.push({
+                    id: notificationId,
+                    type: 'reminder',
+                    eventId: event.id,
+                    name: name,
+                    mobile: mobile,
+                    date: eventDate,
+                    daysText: 'நாளை மறுநாள்',
+                    diffDays: 2,
+                    flag: "before 2 day reminder done" // Tag to add when clicked
+                });
+            }
+            
+            // 2. Before 1 Day (Tomorrow) or Today (0)
+            if (diffDays === 1 || diffDays === 0) {
+                if (desc.includes("before 1 day reminder done")) return; // Skip if done
+                
+                const dText = diffDays === 0 ? 'இன்று' : 'நாளை';
+                notifications.push({
+                    id: notificationId,
+                    type: 'reminder',
+                    eventId: event.id,
+                    name: name,
+                    mobile: mobile,
+                    date: eventDate,
+                    daysText: dText,
+                    diffDays: diffDays,
+                    flag: "before 1 day reminder done" // Tag to add when clicked
+                });
+            }
+            
+            // 3. After 1 Day (Thank You) - Checks yesterday (-1) or day before (-2)
+            if (diffDays >= -2 && diffDays < 0) {
+                if (desc.includes("after 1 day thank reminder done")) return; // Skip if done
+                
+                const dText = diffDays === -1 ? 'நேற்று' : 'நேற்று முந்தைய நாள்';
+                notifications.push({
+                    id: notificationId,
+                    type: 'thank',
+                    eventId: event.id,
+                    name: name,
+                    mobile: mobile,
+                    date: eventDate,
+                    daysText: dText,
+                    diffDays: diffDays,
+                    flag: "after 1 day thank reminder done" // Tag to add when clicked
+                });
+            }
+        });
+        
+        renderNotifications();
+        
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+    }
+}
+// Handles "Mark Done" / Dismiss click
+function handleNotificationDismiss(eventId, flag) {
+    if(confirm('Mark this notification as done? This will update the Calendar event.')) {
+        markNotificationAsDone(eventId, flag);
+    }
+}
 function dismissNotification(notificationId) {
     dismissedNotifications.push(notificationId);
     saveToLocalStorage('dismissedNotifications', dismissedNotifications);
@@ -737,92 +958,37 @@ function sendReminderWhatsApp(notificationId, name, mobile, dateStr, daysText) {
     }
     
     const date = new Date(dateStr);
-    const formattedDate = date.toLocaleDateString('ta-IN', { 
-        day: 'numeric', 
-        month: 'long', 
-        year: 'numeric',
-        weekday: 'long'
-    });
-    
-    const formattedTime = date.toLocaleTimeString('ta-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    });
+    const formattedDate = date.toLocaleDateString('ta-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    const formattedTime = date.toLocaleTimeString('ta-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
     
     let mobileNum = mobile.replace(/^0+/, '');
-    if (!mobileNum.startsWith('91')) {
-        mobileNum = '91' + mobileNum;
-    }
-    
-    const message = `🔔💐 *திருமண விழா நினைவூட்டல்* 💐🔔
+    if (!mobileNum.startsWith('91')) mobileNum = '91' + mobileNum;
 
-அன்புள்ள *${name}* அவர்களுக்கு,
+    const message = `🔔💐 *திருமண விழா நினைவூட்டல்* 💐🔔\n\nஅன்புள்ள *${name}* அவர்களுக்கு,\n\nஉங்கள் இனிய திருமண விழா ${daysText} சிறப்பாக நடைபெற உள்ளது 🎉\n\n📅 தேதி: ${formattedDate}\n🕒 நேரம்: ${formattedTime}\n\nஎங்கள் *காவேரி திருமண மண்டபத்தில்* உங்கள் விழா சிறப்பாக நடைபெற அனைத்து ஏற்பாடுகளும் தயார் நிலையில் உள்ளது.\n\n📞 99446 45441\n\n🙏 நன்றி!`;
 
-உங்கள் இனிய திருமண விழா ${daysText} சிறப்பாக நடைபெற உள்ளது 🎉
-
-📅 *திருமணம் நடைபெறும் தேதி:* ${formattedDate}
-🕒 *நிகழ்ச்சி நேரம்:* ${formattedTime}
-
-💖 *கல்யாண வாழ்த்து* 💖
-
-_"கலியாணம் செழிப்பின் சிறந்த ஒளி;_
-_குடும்பம் வளமுடன் நிறையட்டும்."_
-— ஒரு திருக்குறள் சிந்தனை
-
-எங்கள் *காவேரி திருமண மண்டபத்தில்*
-உங்கள் விழா சிறப்பாக நடைபெற அனைத்து ஏற்பாடுகளும் தயார் நிலையில் உள்ளது.
-
-🎊 உங்கள் மகிழ்ச்சியான தருணத்தில்
-நாங்கள் ஒரு பகுதியாக இருப்பதில் பெருமை அடைகிறோம்.
-
-மேலும் உதவி தேவைப்பட்டால் தயங்காமல் தொடர்பு கொள்ளவும்.
-
-📞 99446 45441
-
-🌸 *காவேரி திருமண மண்டபம்*
-Cauvery Wedding Hall
-
-🙏 நன்றி! உங்கள் விழா சிறப்பாக அமைய வாழ்த்துக்கள்!`;
-    
-    const encodedMessage = encodeURIComponent(message);
-    const url = `https://wa.me/${mobileNum}?text=${encodedMessage}`;
-    
+    const url = `https://wa.me/${mobileNum}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
-    dismissNotification(notificationId);
+    
+    // AUTO MARK AS DONE after sending
+    markNotificationAsDone(eventId, flag);
 }
 
-function sendThankYouWhatsApp(notificationId, name, mobile) {
+function sendThankYouWhatsApp(eventId, name, mobile, flag) {
     if (!mobile || mobile === 'null') {
-        showAlert('Error', 'Mobile number not available for this customer');
+        showAlert('Error', 'Mobile number not available');
         return;
     }
     
     let mobileNum = mobile.replace(/^0+/, '');
-    if (!mobileNum.startsWith('91')) {
-        mobileNum = '91' + mobileNum;
-    }
-    
-    const message = `🙏 *மனமார்ந்த நன்றி* 🙏
+    if (!mobileNum.startsWith('91')) mobileNum = '91' + mobileNum;
 
-அன்புள்ள *${name}* அவர்களுக்கு,
+    const message = `🙏 *மனமார்ந்த நன்றி* 🙏\n\nஅன்புள்ள *${name}* அவர்களுக்கு,\n\nஉங்கள் இனிய திருமண விழா நன்றாக நடைபெற்றது 🎊\nஎங்களை தேர்வு செய்ததற்கு மனமார்ந்த நன்றி.\n\n🌺 *காவேரி திருமண மண்டபம்*\n📞 தொடர்புக்கு: 99446 45441\n\n✨ இனிய வாழ்த்துக்கள்!`;
 
-உங்கள் இனிய திருமண விழா நன்றாக நடைபெற்றது 🎊
-அது உங்கள் வாழ்வில் இனிமையும் அமைதியையும் சேர்க்கட்டும் 🌸
-
-எங்களை தேர்வு செய்ததற்கு மனமார்ந்த நன்றி.
-உங்கள் குடும்ப நிகழ்ச்சிகளில் மீண்டும் சேவை செய்ய நாங்கள் எப்போதும் தயாராக இருக்கிறோம் 🙏
-
-🌺 *காவேரி திருமண மண்டபம்*
-📞 தொடர்புக்கு: 99446 45441
-
-✨ இனிய வாழ்த்துக்கள்! உங்கள் வாழ்கை எப்போதும் மகிழ்ச்சியுடன் நிரம்பட்டும்!`;
-    
-    const encodedMessage = encodeURIComponent(message);
-    const url = `https://wa.me/${mobileNum}?text=${encodedMessage}`;
-    
+    const url = `https://wa.me/${mobileNum}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
-    dismissNotification(notificationId);
+
+    // AUTO MARK AS DONE after sending
+    markNotificationAsDone(eventId, flag);
 }
 
 document.addEventListener('click', function(event) {
@@ -1044,7 +1210,7 @@ function openWhatsApp() {
     
     message += `💰 *மண்டபம் வாடகை:* ₹${bookingData.totalHall.toLocaleString('en-IN')}\n`;
     message += `💵 *முன்பணம்:* ₹${bookingData.advance.toLocaleString('en-IN')}\n`;
-    message += `📌 *பாக்கி தொகை:* ₹${bookingData.pending.toLocaleString('en-IN')}\n\n`;
+    message += `📌 *பாக்கி தொகை:* ₹${bookingData.pendingHall.toLocaleString('en-IN')}\n\n`;
     
     let hasServices = false;
     let servicesText = '';
@@ -1166,66 +1332,80 @@ async function handlePreviewPDF() {
 
 async function handleFormSubmit(e) {
     e.preventDefault();
-    const editId = document.getElementById('editEventId') ? document.getElementById('editEventId').value : null;
+    
+    // 1. Force Recalculation of all totals to ensure bookingData is fresh
+    calculateTotal(); 
 
+    // 2. Validate Inputs
     if (!validateAllFields()) {
         showAlert('Validation Error', 'Please fix all errors before submitting.');
-        const firstError = document.querySelector('.invalid');
-        if (firstError) {
-            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
         return;
     }
 
+    // 3. Check if this is an Update or New Booking
+    const editId = document.getElementById('editEventId').value;
+    
     showModal('loadingModal');
 
     try {
-        if (userEmail && gapiInited && gapi.client.getToken()) {
-            try {
-                if (editId) {
-                    await updateCalendarEvent(editId);
-                    hideModal('loadingModal');
-                    showSuccessAlert("Success", "Booking details updated successfully.");
-                    setTimeout(() => showDashboard(), 1500);
-                    return;
-                } else {
-                    await addToCalendar();
-                }
-            } catch (calError) {
-                console.error('Calendar error:', calError);
-            }
+        if (!gapiInited || !gapi.client.getToken()) {
+            throw new Error("Please sign in with Google first.");
         }
 
-        const pdfData = await generatePDF();
-        
-        if (gapiInited && gapi.client.getToken()) {
+        if (editId) {
+            // --- UPDATE FLOW ---
+            console.log("Updating Event ID:", editId);
+            await updateCalendarEvent(editId);
+            
+            hideModal('loadingModal');
+            showSuccessAlert("Updated!", "Booking details updated successfully.");
+            
+            // Generate PDF for the updated booking so it's ready for WhatsApp
+            // await generatePDF(); 
+            
+            // Reset to dashboard after short delay
+            setTimeout(() => {
+                cancelEdit(); // Clears form and returns to dashboard
+            }, 2000);
+
+        } else {
+            // --- CREATE FLOW ---
+            console.log("Creating New Event");
+            await addToCalendar();
+            
+            // Generate and Upload PDF
+            const pdfData = await generatePDF();
             finalPdfLink = await uploadToDrive(pdfData.blob, pdfData.fileName);
+            
+            // Update the calendar event with the PDF link if we got one
+            // (Optional step, handled if you want the link in the calendar description)
+
+            hideModal('loadingModal');
+            showModal('successModal');
         }
-
-        hideModal('loadingModal');
-        showModal('successModal');
-
-        // DON'T RESET - Keep data for WhatsApp
 
     } catch (err) {
-        console.error('Submission error:', err);
+        console.error('Submission Error:', err);
         hideModal('loadingModal');
-        showAlert('Error', 'Something went wrong: ' + err.message);
+        showAlert('Error', 'Operation failed: ' + err.message);
     }
 }
 
 function buildEventDescription(name, mobile, city, givenBy) {
     const servicesText = [];
-    if (bookingData.fees.cleaning > 0) servicesText.push(`Cleaning: ₹${bookingData.fees.cleaning.toLocaleString('en-IN')}`);
-    if (bookingData.fees.ac > 0) servicesText.push(`AC Rooms: ₹${bookingData.fees.ac.toLocaleString('en-IN')}`);
-    if (bookingData.fees.lights > 0) servicesText.push(`Serial Lights: ₹${bookingData.fees.lights.toLocaleString('en-IN')}`);
-    if (bookingData.fees.speaker > 0) servicesText.push(`Speaker: ₹${bookingData.fees.speaker.toLocaleString('en-IN')}`);
-    if (bookingData.fees.ilai > 0) servicesText.push(`Sapadu Ilai: ₹${bookingData.fees.ilai.toLocaleString('en-IN')}`);
-    if (bookingData.fees.waterCan > 0) servicesText.push(`Water Can: ₹${bookingData.fees.waterCan.toLocaleString('en-IN')}`);
     
+    // exact text keys used for parsing later
+    if (document.getElementById('cleaningFee').checked) servicesText.push(`Cleaning Fee: ₹${document.getElementById('cleaningFeeAmount').value}`);
+    if (document.getElementById('acRooms').checked) servicesText.push(`AC Rooms: ₹${document.getElementById('acRoomsAmount').value}`);
+    if (document.getElementById('serialLights').checked) servicesText.push(`Serial Lights: ₹${document.getElementById('serialLightsAmount').value}`);
+    if (document.getElementById('speaker').checked) servicesText.push(`Speaker: ₹${document.getElementById('speakerAmount').value}`);
+    if (document.getElementById('sapaduIlai').checked) servicesText.push(`Sapadu Ilai: ₹${document.getElementById('sapaduIlaiAmount').value}`);
+    if (document.getElementById('waterCan').checked) servicesText.push(`Water Can: ₹${document.getElementById('waterCanAmount').value}`);
+    
+    // Dynamic 'Others'
     if (bookingData.fees.others && bookingData.fees.others.length > 0) {
         bookingData.fees.others.forEach(other => {
-            servicesText.push(`${other.title}: ₹${other.amount.toLocaleString('en-IN')}`);
+            servicesText.push(`Other-${other.title}: ₹${other.amount}`);
         });
     }
     
@@ -1249,18 +1429,25 @@ Booked By: ${givenBy}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💰 PAYMENT DETAILS:
-Total Hall Amount: ₹${bookingData.totalHall.toLocaleString('en-IN')}
-Advance Paid: ₹${bookingData.advance.toLocaleString('en-IN')}
-Pending Amount: ₹${bookingData.pending.toLocaleString('en-IN')}
+Total Hall Amount: ₹${bookingData.totalHall}
+Advance Paid: ₹${bookingData.advance}
+Pending Hall Amount: ₹${bookingData.pendingHall}
+Hall Settled: ${bookingData.hallSettled ? 'YES' : 'NO'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🎯 ADDITIONAL SERVICES:
 ${servicesText.length > 0 ? servicesText.join('\n') : 'No additional services selected'}
 
+Total Addons Amount: ₹${bookingData.totalAddons}
+Pending Addons Amount: ₹${bookingData.pendingAddons}
+Addons Settled: ${bookingData.addonsSettled ? 'YES' : 'NO'}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🧾 FINAL TOTAL AMOUNT: ₹${bookingData.finalTotal.toLocaleString('en-IN')}
+🧾 GRAND TOTALS:
+Total Bill Value: ₹${bookingData.finalTotal}
+Total Pending Amount: ₹${bookingData.totalPending}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1316,14 +1503,20 @@ async function addToCalendar() {
 }
 
 async function updateCalendarEvent(eventId) {
+    // 1. Helper to get values
     const getTxt = (id) => document.getElementById(id).value;
+    
+    // 2. Get fresh data from Form
     const name = getTxt('marriagePersonName');
     const mobile = getTxt('mobileNumber');
     const city = getTxt('customerFrom');
     const givenBy = getTxt('amountGivenBy');
     
+    // 3. Generate Description using the Global 'bookingData' 
+    // (which was refreshed by calculateTotal() in handleFormSubmit)
     const desc = buildEventDescription(name, mobile, city, givenBy);
 
+    // 4. Construct Event Object
     const event = {
         'summary': `Marriage - ${name}`,
         'description': desc,
@@ -1345,11 +1538,18 @@ async function updateCalendarEvent(eventId) {
         }
     };
 
-    await gapi.client.calendar.events.update({
-        'calendarId': 'primary',
-        'eventId': eventId,
-        'resource': event
-    });
+    // 5. Send to Google Calendar
+    try {
+        await gapi.client.calendar.events.update({
+            'calendarId': 'primary',
+            'eventId': eventId,
+            'resource': event
+        });
+        console.log("Calendar Event Updated Successfully");
+    } catch (error) {
+        console.error("Google Calendar Update Failed:", error);
+        throw new Error("Failed to update Google Calendar.");
+    }
 }
 
 function populatePDFTemplate() {
@@ -1388,7 +1588,7 @@ function populatePDFTemplate() {
 
     setTxt('pdf_hall', bookingData.totalHall.toLocaleString('en-IN'));
     setTxt('pdf_advance', bookingData.advance.toLocaleString('en-IN'));
-    setTxt('pdf_pending', bookingData.pending.toLocaleString('en-IN'));
+    setTxt('pdf_pending', bookingData.pendingHall.toLocaleString('en-IN'));
     setTxt('pdf_final', bookingData.finalTotal.toLocaleString('en-IN'));
 
     setTxt('pdf_givenBy', getTxt('amountGivenBy'));
@@ -1576,13 +1776,25 @@ async function fetchBookings() {
 }
 
 function handleSearch(e) {
-    const term = e.target.value.toLowerCase();
+    const term = e.target.value.toLowerCase().trim();
     
-    filteredBookings = allBookings.filter(booking => 
-        booking.name.toLowerCase().includes(term) || 
-        booking.mobile.includes(term) ||
-        booking.city.toLowerCase().includes(term)
-    );
+    filteredBookings = allBookings.filter(booking => {
+        // 1. Search by Name
+        const nameMatch = booking.name.toLowerCase().includes(term);
+        
+        // 2. Search by Mobile
+        const mobileMatch = booking.mobile.includes(term);
+        
+        // 3. Search by City
+        const cityMatch = booking.city.toLowerCase().includes(term);
+        
+        // 4. Search by Date String (This enables "Feb", "17 Feb", "2025", etc.)
+        // This works because booking.dateStr is formatted like "17 Feb 2026"
+        const dateMatch = booking.dateStr.toLowerCase().includes(term);
+
+        // Return true if ANY of these match
+        return nameMatch || mobileMatch || cityMatch || dateMatch;
+    });
 
     currentPage = 1;
     renderTable();
@@ -1688,83 +1900,24 @@ function renderPagination() {
 }
 
 async function viewBooking(eventId) {
-    showModal('loadingModal');
+    // Reuse editBooking logic to populate form
+    await editBooking(eventId);
+
+    // Then disable everything
+    const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea, #bookingForm button');
+    inputs.forEach(input => {
+        // Keep cancel button enabled
+        if (input.id !== 'cancelEditBtn') input.disabled = true;
+    });
+
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('previewPdfBtn').style.display = 'none';
     
-    try {
-        showBookingForm();
-        
-        const response = await gapi.client.calendar.events.get({
-            'calendarId': 'primary',
-            'eventId': eventId
-        });
-        const event = response.result;
-
-        const idField = document.getElementById('editEventId');
-        if (idField) idField.value = eventId;
-
-        const desc = event.description || "";
-        const extract = (label) => {
-            const regex = new RegExp(`${label}: (.*?)(\\n|$)`);
-            const match = desc.match(regex);
-            return match ? match[1].trim() : '';
-        };
-
-        const cleanAmt = (val) => {
-            if (!val) return 0;
-            return parseFloat(val.replace(/[₹,]/g, '')) || 0;
-        };
-
-        document.getElementById('marriagePersonName').value = event.summary.replace('Marriage - ', '');
-        document.getElementById('mobileNumber').value = extract('Mobile Number') || '';
-        document.getElementById('customerFrom').value = extract('Customer City') || '';
-        document.getElementById('amountGivenBy').value = extract('Booked By') || '';
-
-        if(event.start && event.start.dateTime) {
-            const start = new Date(event.start.dateTime);
-            const end = new Date(event.end.dateTime);
-            
-            const formatDateTime = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
-                return `${year}-${month}-${day}T${hours}:${minutes}`;
-            };
-            
-            document.getElementById('fromDateTime').value = formatDateTime(start);
-            document.getElementById('toDateTime').value = formatDateTime(end);
-            document.getElementById('marriageDate').value = start.toISOString().split('T')[0];
-        }
-
-        document.getElementById('totalHallAmount').value = cleanAmt(extract('Total Hall Amount'));
-        document.getElementById('advanceAmount').value = cleanAmt(extract('Advance Paid'));
-
-        calculateTotal();
-
-        const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea');
-        inputs.forEach(input => {
-            input.disabled = true;
-        });
-        
-        document.getElementById('submitBtn').style.display = 'none';
-        document.getElementById('previewPdfBtn').style.display = 'none';
-        
-        const cancelBtn = document.getElementById('cancelEditBtn');
-        cancelBtn.innerText = "Close View";
-        cancelBtn.style.display = 'inline-block';
-        cancelBtn.disabled = false;
-        
-        document.querySelector('.form-header h3').innerText = "View Booking Details";
-        
-        hideModal('loadingModal');
-
-    } catch (error) {
-        console.error("View Error:", error);
-        hideModal('loadingModal');
-        showAlert("Error", "Could not load booking details.");
-        showDashboard();
-    }
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    cancelBtn.innerText = "Close View";
+    cancelBtn.disabled = false;
+    
+    document.querySelector('.form-header h3').innerText = "View Booking Details";
 }
 
 async function editBooking(eventId) {
@@ -1778,76 +1931,104 @@ async function editBooking(eventId) {
             'eventId': eventId
         });
         const event = response.result;
-
-        const idField = document.getElementById('editEventId');
-        if (idField) idField.value = eventId;
-
         const desc = event.description || "";
+
+        document.getElementById('editEventId').value = eventId;
+
+        // --- Helper Regex ---
         const extract = (label) => {
             const regex = new RegExp(`${label}: (.*?)(\\n|$)`);
             const match = desc.match(regex);
             return match ? match[1].trim() : '';
         };
+        const cleanAmt = (val) => val ? parseFloat(val.replace(/[₹,]/g, '')) || 0 : 0;
 
-        const cleanAmt = (val) => {
-            if (!val) return 0;
-            return parseFloat(val.replace(/[₹,]/g, '')) || 0;
-        };
-
+        // 1. Basic Fields
         document.getElementById('marriagePersonName').value = event.summary.replace('Marriage - ', '');
-        document.getElementById('mobileNumber').value = extract('Mobile Number') || '';
-        document.getElementById('customerFrom').value = extract('Customer City') || '';
-        document.getElementById('amountGivenBy').value = extract('Booked By') || '';
+        document.getElementById('mobileNumber').value = extract('Mobile Number');
+        document.getElementById('customerFrom').value = extract('Customer City');
+        document.getElementById('amountGivenBy').value = extract('Booked By');
 
+        // 2. Dates
         if(event.start && event.start.dateTime) {
             const start = new Date(event.start.dateTime);
             const end = new Date(event.end.dateTime);
-            
-            const formatDateTime = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
-                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            const toLocalISO = (date) => {
+                const offset = date.getTimezoneOffset() * 60000;
+                return new Date(date.getTime() - offset).toISOString().slice(0, 16);
             };
-            
-            document.getElementById('fromDateTime').value = formatDateTime(start);
-            document.getElementById('toDateTime').value = formatDateTime(end);
+            document.getElementById('fromDateTime').value = toLocalISO(start);
+            document.getElementById('toDateTime').value = toLocalISO(end);
             document.getElementById('marriageDate').value = start.toISOString().split('T')[0];
+            document.getElementById('bookingDate').value = toLocalISO(new Date()); 
         }
 
+        // 3. Hall Payments
         document.getElementById('totalHallAmount').value = cleanAmt(extract('Total Hall Amount'));
         document.getElementById('advanceAmount').value = cleanAmt(extract('Advance Paid'));
+        const hallSettled = extract('Hall Settled');
+        document.getElementById('hallSettled').checked = (hallSettled === 'YES');
+
+        // 4. CHECKBOXES (Safe Check)
+        // Checks if the label exists in description OR if amount > 0 was saved previously
+        const hasText = (txt) => desc.includes(txt);
+        document.getElementById('cleaningFee').checked = hasText('Cleaning Fee') || hasText('Cleaning:');
+        document.getElementById('acRooms').checked = hasText('AC Rooms');
+        document.getElementById('serialLights').checked = hasText('Serial Lights');
+        document.getElementById('speaker').checked = hasText('Speaker');
+        document.getElementById('sapaduIlai').checked = hasText('Sapadu Ilai');
+        document.getElementById('waterCan').checked = hasText('Water Can');
+
+        // 5. RESTORE OTHERS (CRITICAL FIX)
+        document.getElementById('othersContainer').innerHTML = ''; 
+        otherServiceCount = 0; // <--- THIS LINE FIXES THE CRASH
+        document.getElementById('others').checked = false;
         
-        // Show status dropdown and set value
+        // Find lines starting with "Other-" or look for patterns like "Title: ₹Amount"
+        // We look for the pattern used in buildEventDescription: "Other-Title: ₹Amount"
+        const otherMatches = desc.match(/Other-(.*?): ₹([\d,]+)/g);
+        
+        if (otherMatches && otherMatches.length > 0) {
+            document.getElementById('others').checked = true;
+            document.getElementById('othersFields').style.display = 'block';
+            
+            otherMatches.forEach(match => {
+                // Extract Title and Amount safely
+                const parts = match.match(/Other-(.*?): ₹([\d,]+)/);
+                if (parts) {
+                    const title = parts[1].trim();
+                    const amount = parseFloat(parts[2].replace(/,/g, ''));
+                    addOtherService(title, amount); 
+                }
+            });
+        } else {
+             document.getElementById('othersFields').style.display = 'none';
+        }
+
+        // 6. Addon Totals & Status
+        document.getElementById('totalAddonsAmount').value = cleanAmt(extract('Total Addons Amount'));
+        document.getElementById('pendingAddonsAmount').value = cleanAmt(extract('Pending Addons Amount'));
+        const addonsSettled = extract('Addons Settled');
+        document.getElementById('addonsSettled').checked = (addonsSettled === 'YES');
+
+        // 7. Status
         const statusGroup = document.getElementById('statusGroup');
         const statusField = document.getElementById('bookingStatus');
         statusGroup.style.display = 'block';
         const statusMatch = desc.match(/STATUS: (.+)/);
-        if (statusMatch) {
-            statusField.value = statusMatch[1].trim();
-        }
+        if (statusMatch) statusField.value = statusMatch[1].trim();
 
-        calculateTotal();
-
-        const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea');
-        inputs.forEach(input => {
-            input.disabled = false;
-        });
-        
-        document.getElementById('submitBtn').style.display = 'inline-flex';
-        document.getElementById('previewPdfBtn').style.display = 'inline-flex';
-        
+        // 8. Update UI
         const submitBtn = document.getElementById('submitBtn');
+        // IMPORTANT: Use innerHTML to set the icon AND text correctly
         submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Booking';
+        submitBtn.style.display = 'inline-flex';
         
-        const cancelBtn = document.getElementById('cancelEditBtn');
-        cancelBtn.innerText = "Cancel Edit";
-        cancelBtn.style.display = 'inline-block';
-        cancelBtn.disabled = false;
-        
+        document.getElementById('cancelEditBtn').style.display = 'inline-block';
         document.querySelector('.form-header h3').innerText = "Edit Booking";
+
+        // 9. Recalculate Totals (Now safe because count is reset)
+        calculateTotal();
         
         hideModal('loadingModal');
 
@@ -1855,7 +2036,6 @@ async function editBooking(eventId) {
         console.error("Edit Error:", error);
         hideModal('loadingModal');
         showAlert("Error", "Could not load booking details.");
-        showDashboard();
     }
 }
 
@@ -1947,14 +2127,17 @@ async function deleteBooking(eventId) {
 }
 
 function cancelEdit() {
+    // 1. Reset Form
     document.getElementById('bookingForm').reset();
     
-    const idField = document.getElementById('editEventId');
-    if (idField) idField.value = '';
+    // 2. Clear Edit ID
+    document.getElementById('editEventId').value = '';
 
+    // 3. Re-enable all inputs
     const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea');
     inputs.forEach(input => input.disabled = false);
 
+    // 4. Reset Buttons
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Download';
     submitBtn.style.display = 'inline-flex';
@@ -1962,11 +2145,15 @@ function cancelEdit() {
     document.getElementById('previewPdfBtn').style.display = 'inline-flex';
     document.getElementById('cancelEditBtn').style.display = 'none';
     document.getElementById('statusGroup').style.display = 'none';
+    
+    // 5. Reset Header
     document.querySelector('.form-header h3').innerText = "Wedding Hall Booking Form";
 
+    // 6. Reset State
     setDefaultDate();
     calculateTotal();
     
+    // 7. Go to Dashboard
     showDashboard();
 }
 
@@ -2029,22 +2216,78 @@ async function openWhatsAppFromDashboard(eventId) {
 }
 
 /* EXPENSE MANAGEMENT */
-function openExpenseModal(eventId) {
+async function openExpenseModal(eventId) {
+    // 1. Set ID and Reset UI initially
     document.getElementById('expenseEventId').value = eventId;
-    document.getElementById('exp_staffSalary').value = 0;
-    document.getElementById('exp_ilaiCleaning').value = 0;
-    document.getElementById('exp_currentBill').value = 0;
-    document.getElementById('exp_purchase').value = 0;
-    document.getElementById('exp_damage').value = 0;
-    document.getElementById('exp_development').value = 0;
     document.getElementById('showOthers').checked = false;
     document.getElementById('otherExpensesList').innerHTML = '';
     otherExpenseCount = 0;
     
-    calculateTotalExpenses();
-    showModal('expenseModal');
-}
+    // Show loading state inside the modal inputs if you like, or just wait
+    // For now, we set them to 0 as placeholders until data loads
+    const setVal = (id, val) => document.getElementById(id).value = val;
+    setVal('exp_staffSalary', 0);
+    setVal('exp_ilaiCleaning', 0);
+    setVal('exp_currentBill', 0);
+    setVal('exp_purchase', 0);
+    setVal('exp_damage', 0);
+    setVal('exp_development', 0);
+    document.getElementById('totalExpensesDisplay').innerText = "0";
 
+    showModal('expenseModal');
+    
+    // 2. Fetch Event Data to Populate
+    try {
+        const response = await gapi.client.calendar.events.get({
+            'calendarId': 'primary',
+            'eventId': eventId
+        });
+        const event = response.result;
+        const desc = event.description || "";
+
+        // 3. Helper to parse money (e.g., "Staff Salary: ₹5,000")
+        const extractExpense = (label) => {
+            // Regex looks for "Label: ₹5,000"
+            const regex = new RegExp(`${label}: ₹([\\d,]+)`);
+            const match = desc.match(regex);
+            return match ? parseFloat(match[1].replace(/,/g, '')) : 0;
+        };
+
+        // 4. Populate Standard Fields
+        setVal('exp_staffSalary', extractExpense('Staff Salary'));
+        setVal('exp_ilaiCleaning', extractExpense('Ilai Eduthal & Cleaning'));
+        setVal('exp_currentBill', extractExpense('Current Bill'));
+        setVal('exp_purchase', extractExpense('Purchase Things'));
+        setVal('exp_damage', extractExpense('Damage Recover'));
+        setVal('exp_development', extractExpense('New Development'));
+
+        // 5. Populate "Other Expenses"
+        // Pattern: "- Title: ₹Amount" under "Other Expenses:" section
+        // We look for lines starting with "- " followed by text and an amount
+        const otherMatches = desc.match(/- (.*?): ₹([\d,]+)/g);
+        
+        if (otherMatches && otherMatches.length > 0) {
+            document.getElementById('showOthers').checked = true;
+            document.getElementById('otherExpensesContainer').style.display = 'block';
+            
+            otherMatches.forEach(match => {
+                const parts = match.match(/- (.*?): ₹([\d,]+)/);
+                if (parts) {
+                    const title = parts[1].trim();
+                    const amount = parseFloat(parts[2].replace(/,/g, ''));
+                    addOtherExpense(title, amount);
+                }
+            });
+        }
+
+        // 6. Update Total Display
+        calculateTotalExpenses();
+
+    } catch (error) {
+        console.error("Error fetching expenses:", error);
+        showAlert("Error", "Could not load existing expenses.");
+    }
+}
 function toggleOtherExpenses() {
     const container = document.getElementById('otherExpensesContainer');
     const checkbox = document.getElementById('showOthers');
@@ -2313,21 +2556,16 @@ async function showReportReview() {
 }
 async function loadReportData() {
     if (!gapiInited || !gapi.client.getToken()) {
-        showAlert('Error', 'Please sign in first to view reports.');
+        showAlert('Error', 'Please sign in first.');
         return;
     }
-    
     showModal('loadingModal');
     
     try {
-        // FIX 1: Set timeMin to the past (e.g., 2024) and REMOVE timeMax
-        // This ensures we get past history AND all future upcoming weddings
         const startHistory = new Date('2024-01-01').toISOString();
-        
         const response = await gapi.client.calendar.events.list({
             'calendarId': 'primary',
             'timeMin': startHistory, 
-            // 'timeMax': removed to allow future bookings!
             'showDeleted': false,
             'singleEvents': true,
             'maxResults': 1000,
@@ -2342,52 +2580,52 @@ async function loadReportData() {
             
             const desc = event.description || "";
             const extract = (label) => {
+                // Regex modified to be safer with different line endings
                 const regex = new RegExp(`${label}: (.*?)(\\n|$)`);
                 const match = desc.match(regex);
                 return match ? match[1].trim() : '';
             };
+            const cleanAmt = (val) => val ? parseFloat(val.replace(/[₹,]/g, '')) || 0 : 0;
             
-            const cleanAmt = (val) => {
-                if (!val) return 0;
-                return parseFloat(val.replace(/[₹,]/g, '')) || 0;
-            };
+            // 1. Extract Values
+            const hallTotal = cleanAmt(extract('Total Hall Amount'));
+            // Support both new 'Pending Hall Amount' and old 'Pending Amount' labels
+            const hallPending = cleanAmt(extract('Pending Hall Amount') || extract('Pending Amount')); 
             
-            // Extract Status correctly
-            const statusMatch = desc.match(/STATUS: (.+)/);
-            let status = statusMatch ? statusMatch[1].trim() : 'UPCOMING';
+            // Extract Addons (Now available in description)
+            const addonsTotal = cleanAmt(extract('Total Addons Amount'));
+            const addonsPending = cleanAmt(extract('Pending Addons Amount'));
             
-            // Normalize status (handle casing or spaces)
-            status = status.toUpperCase().replace(' ', '');
+            // 2. Apply User Formulas
+            // Income = Total Hall + Total Addons
+            const income = hallTotal + addonsTotal;
             
-            const marriageDate = new Date(event.start.dateTime || event.start.date);
-            const hallAmt = cleanAmt(extract('Total Hall Amount'));
-            const advance = cleanAmt(extract('Advance Paid'));
-            const pending = cleanAmt(extract('Pending Amount'));
+            // Pending = Hall Pending + Addons Pending
+            const pending = hallPending + addonsPending;
             
-            // Extract expenses
+            // Expenses (Existing logic)
             let totalExpenses = 0;
             const expenseMatches = desc.match(/EXPENSES:([\s\S]*?)(?=STATUS:|$)/);
             if (expenseMatches) {
-                const expenseText = expenseMatches[1];
-                const expenseLines = expenseText.match(/₹([\d,]+)/g);
-                if (expenseLines) {
-                    expenseLines.forEach(line => {
-                        totalExpenses += cleanAmt(line);
-                    });
-                }
+                const expenseLines = expenseMatches[1].match(/₹([\d,]+)/g);
+                if (expenseLines) expenseLines.forEach(l => totalExpenses += cleanAmt(l));
             }
             
-            const income = hallAmt; 
-            const profit = income - totalExpenses;
+            // Profit
+            const profit = income - totalExpenses; 
             
+            // Status
+            let status = 'UPCOMING';
+            const statusMatch = desc.match(/STATUS: (.+)/);
+            if (statusMatch) status = statusMatch[1].trim().toUpperCase();
+
             reportData.push({
                 id: event.id,
                 name: event.summary.replace('Marriage - ', ''),
-                marriageDate: marriageDate,
-                marriageDateStr: marriageDate.toLocaleDateString('en-IN', { 
-                    day: 'numeric', month: 'short', year: 'numeric' 
-                }),
-                income: income,
+                marriageDate: new Date(event.start.dateTime || event.start.date),
+                marriageDateStr: new Date(event.start.dateTime || event.start.date).toLocaleDateString('en-IN'),
+                income: income, 
+                received: income - pending,
                 expenses: totalExpenses,
                 profit: profit,
                 pending: pending,
@@ -2395,60 +2633,61 @@ async function loadReportData() {
             });
         });
         
-        // Initial load: No filters applied
         filteredReportData = [...reportData];
-        
-        // Render everything
-        renderReportSummary();
-        renderReportTable();
-        renderCharts();
-        
+        applyReportFilters(); 
         hideModal('loadingModal');
         
     } catch (error) {
-        console.error('Error loading reports:', error);
+        console.error(error);
         hideModal('loadingModal');
-        showAlert('Error', 'Could not load report data.');
+        showAlert('Error', 'Failed to generate report');
     }
 }
 
 function renderReportSummary() {
-    // --- PART A: OVERALL STATS (Top Row - Always shows ALL data) ---
-    const allIncome = reportData.reduce((sum, item) => sum + item.income, 0);
-    const allExpenses = reportData.reduce((sum, item) => sum + item.expenses, 0);
-    const allProfit = allIncome - allExpenses;
-    const allFunctions = reportData.length;
+    // Safety check: ensure arrays exist
+    const safeReportData = reportData || [];
+    const safeFilteredData = filteredReportData || [];
 
-    // Use IDs from your HTML: totalFunctions, overallIncome, overallExpenses, netProfit
-    const setText = (id, val) => {
-        const el = document.getElementById(id);
-        if(el) el.innerText = val;
-    };
+    // A. FILTERED DATA
+    const f_income = safeFilteredData.reduce((sum, i) => sum + (Number(i.income) || 0), 0);
+    const f_received = safeFilteredData.reduce((sum, i) => sum + (Number(i.received) || 0), 0);
+    const f_pending = safeFilteredData.reduce((sum, i) => sum + (Number(i.pending) || 0), 0);
+    const f_expenses = safeFilteredData.reduce((sum, i) => sum + (Number(i.expenses) || 0), 0);
+    const f_profit = f_received - f_expenses; 
+    const f_count = safeFilteredData.length;
 
-    setText('totalFunctions', allFunctions);
-    setText('overallIncome', `₹${allIncome.toLocaleString('en-IN')}`);
-    setText('overallExpenses', `₹${allExpenses.toLocaleString('en-IN')}`);
-    setText('netProfit', `₹${allProfit.toLocaleString('en-IN')}`);
+    // B. OVERALL DATA
+    const o_received = safeReportData.reduce((sum, i) => sum + (Number(i.received) || 0), 0);
+    const o_expenses = safeReportData.reduce((sum, i) => sum + (Number(i.expenses) || 0), 0);
+    const o_profit = o_received - o_expenses;
+    const o_count = safeReportData.length;
 
+    const setText = (id, val) => { const e = document.getElementById(id); if(e) e.innerText = val; };
+    
+    // USE formatMoney() HERE
+    setText('totalFunctions', o_count);
+    setText('overallIncome', `₹${formatMoney(o_received)}`);
+    setText('overallExpenses', `₹${formatMoney(o_expenses)}`);
+    setText('netProfit', `₹${formatMoney(o_profit)}`);
 
-    // --- PART B: FILTERED STATS (Bottom Row - Changes with Dropdowns) ---
-    const filtIncome = filteredReportData.reduce((sum, item) => sum + item.income, 0);
-    const filtExpenses = filteredReportData.reduce((sum, item) => sum + item.expenses, 0);
-    const filtProfit = filtIncome - filtExpenses;
-    const filtWeddings = filteredReportData.length;
-
-    // Use IDs from your HTML: filteredWeddings, filteredIncome, filteredExpenses, filteredProfit
-    setText('filteredWeddings', filtWeddings);
-    setText('filteredIncome', `₹${filtIncome.toLocaleString('en-IN')}`);
-    setText('filteredExpenses', `₹${filtExpenses.toLocaleString('en-IN')}`);
-    setText('filteredProfit', `₹${filtProfit.toLocaleString('en-IN')}`);
+    setText('filteredWeddings', f_count);
+    setText('filteredIncome', `₹${formatMoney(f_received)}`);
+    setText('filteredExpenses', `₹${formatMoney(f_expenses)}`);
+    setText('filteredProfit', `₹${formatMoney(f_profit)}`);
+    setText('filteredPending', `₹${formatMoney(f_pending)}`);
 }
-
+/* --- HELPER: Safe Money Formatter --- */
+function formatMoney(amount) {
+    // Convert to number, default to 0 if null/undefined/NaN
+    const safeAmount = Number(amount) || 0; 
+    return safeAmount.toLocaleString('en-IN');
+}
 function renderReportTable() {
     const tbody = document.getElementById('reportTableBody');
     tbody.innerHTML = '';
     
-    if (filteredReportData.length === 0) {
+    if (!filteredReportData || filteredReportData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="text-center">No data matches your filters</td></tr>';
         return;
     }
@@ -2461,19 +2700,32 @@ function renderReportTable() {
         const tr = document.createElement('tr');
         const statusColor = getStatusColor(item.status);
         
+        // --- DATE FORMATTER ---
+        let formattedDate = "N/A";
+        if (item.marriageDate) {
+            const dateObj = new Date(item.marriageDate);
+            if (!isNaN(dateObj)) {
+                formattedDate = dateObj.toLocaleDateString('en-GB', { 
+                    day: 'numeric', 
+                    month: 'short', 
+                    year: 'numeric' 
+                });
+            }
+        }
+        
         tr.innerHTML = `
-            <td>
-                <strong>${item.name}</strong>
-            </td>
-            <td>${item.marriageDateStr}</td>
-            <td class="amount-cell" style="color:#00b894">₹${item.income.toLocaleString('en-IN')}</td>
-            <td class="amount-cell" style="color:#e74c3c">₹${item.expenses.toLocaleString('en-IN')}</td>
-            <td class="amount-cell">₹${item.pending.toLocaleString('en-IN')}</td>
-            <td>
+            <td><strong>${item.name || 'Unknown'}</strong></td>
+            <td>${formattedDate}</td>
+            
+            <td class="amount-cell" style="color:#00b894">₹${formatMoney(item.income)}</td>
+            <td class="amount-cell">₹${formatMoney(item.pending)}</td>
+            <td class="amount-cell" style="color:#e74c3c">₹${formatMoney(item.expenses)}</td>
+            <td ondblclick="enableInlineStatusEdit(this, '${item.id}', '${item.status}')" style="cursor: pointer;" title="Double click to change status">
                 <span class="status-badge" style="background-color: ${statusColor}; padding: 4px 8px; border-radius: 4px; color: white; font-size: 12px;">
-                    ${item.status}
+                    ${item.status || 'UPCOMING'}
                 </span>
             </td>
+            
             <td>
                 <button class="icon-btn btn-edit" onclick="editBooking('${item.id}')" title="Edit Status & Details" style="width:30px; height:30px;">
                     <i class="fas fa-pen"></i>
@@ -2484,6 +2736,88 @@ function renderReportTable() {
     });
     
     renderReportPagination();
+}
+/* --- INLINE STATUS EDITING LOGIC --- */
+
+// 1. Convert Cell to Dropdown
+function enableInlineStatusEdit(td, eventId, currentStatus) {
+    // Prevent re-creating dropdown if already active
+    if (td.querySelector('select')) return;
+
+    const options = ['UPCOMING', 'INPROGRESS', 'COMPLETED', 'POSTPONED', 'REJECTED', 'REFUND'];
+    
+    let selectHtml = `<select class="status-dropdown" 
+        onchange="saveInlineStatus('${eventId}', this.value)" 
+        onblur="cancelInlineStatusEdit()" 
+        style="padding: 6px; border-radius: 4px; border: 2px solid #6c5ce7; font-size: 12px; font-weight: bold;">`;
+    
+    options.forEach(opt => {
+        const selected = opt === currentStatus ? 'selected' : '';
+        selectHtml += `<option value="${opt}" ${selected}>${opt}</option>`;
+    });
+    selectHtml += `</select>`;
+    
+    td.innerHTML = selectHtml;
+    
+    // Auto-focus the dropdown so 'onblur' works if they click away
+    const select = td.querySelector('select');
+    select.focus();
+}
+
+// 2. Save Logic (Updates Google Calendar)
+async function saveInlineStatus(eventId, newStatus) {
+    // Show spinner immediately to indicate processing
+    showModal('loadingModal');
+    
+    try {
+        const response = await gapi.client.calendar.events.get({
+            'calendarId': 'primary',
+            'eventId': eventId
+        });
+        
+        const event = response.result;
+        let desc = event.description || "";
+        
+        // Regex to replace the existing STATUS line
+        if (desc.includes('STATUS:')) {
+            desc = desc.replace(/STATUS: .*/, `STATUS: ${newStatus}`);
+        } else {
+            // Append if missing
+            desc += `\nSTATUS: ${newStatus}`;
+        }
+        
+        event.description = desc;
+        
+        // Update Calendar
+        await gapi.client.calendar.events.update({
+            'calendarId': 'primary',
+            'eventId': eventId,
+            'resource': event
+        });
+        
+        // Refresh Data to reflect changes
+        await loadReportData();
+        
+        showSuccessAlert('Updated', `Status changed to ${newStatus}`);
+        
+    } catch (error) {
+        console.error("Status Update Error:", error);
+        hideModal('loadingModal');
+        showAlert('Error', 'Failed to update status.');
+        cancelInlineStatusEdit(); // Revert UI
+    }
+}
+
+// 3. Cancel Logic (Reverts UI on click away)
+function cancelInlineStatusEdit() {
+    // We simply re-render the table to get back the span
+    // Using a small timeout to allow 'onchange' to fire first if a value was selected
+    setTimeout(() => {
+        // Only re-render if the modal isn't open (meaning no save is in progress)
+        if (!document.getElementById('loadingModal').classList.contains('show')) {
+            renderReportTable();
+        }
+    }, 200);
 }
 
 function getStatusColor(status) {
@@ -2856,7 +3190,7 @@ function renderLineChart() {
                     },
                     ticks: {
                         callback: function(value) {
-                            return '₹' + value.toLocaleString('en-IN');
+                            return '₹' + formatMoney(value);
                         }
                     }
                 },
@@ -2918,7 +3252,7 @@ function renderBarChart() {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '₹' + value.toLocaleString('en-IN');
+                            return '₹' + formatMoney(value);
                         }
                     }
                 }
@@ -2931,7 +3265,7 @@ function renderBarChart() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.dataset.label + ': ₹' + context.parsed.y.toLocaleString('en-IN');
+                            return context.dataset.label + ': ₹' + formatMoney(context.parsed.y);
                         }
                     }
                 }
