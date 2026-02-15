@@ -81,7 +81,7 @@ function setupListeners() {
     document.getElementById('fromDateTime').addEventListener('change', validateDates);
     document.getElementById('toDateTime').addEventListener('change', validateDates);
     document.getElementById('marriageDate').addEventListener('change', validateMarriageDate);
-     document.getElementById('bookingDate').addEventListener('change', validateMarriageDate);
+    document.getElementById('bookingDate').addEventListener('change', validateMarriageDate);
 
     // Form Submit
     document.getElementById('bookingForm').addEventListener('submit', handleFormSubmit);
@@ -430,7 +430,7 @@ function handleAuthClick() {
             btn.classList.add('success');
             document.getElementById('btnText').innerText = `${userEmail}`;
             document.getElementById('btnLoader').classList.replace('fa-google','fab fa-google');
-            showAlert('Sucess', 'user logged in sucessfully.');
+            showAlert('Success', 'User logged in successfully.');
         } catch (error) {
             console.error('Error fetching user info:', error);
             showAlert('Error', 'Could not retrieve user information.');
@@ -471,7 +471,9 @@ async function handlePreviewPDF() {
         previewContent.style.transformOrigin = 'top center';
         
         const previewFrame = document.getElementById('pdfPreviewFrame');
-        previewFrame.style.display = 'none'; // Hide iframe
+        if (previewFrame) {
+            previewFrame.style.display = 'none'; // Hide iframe
+        }
         
         // Create preview container
         const previewContainer = document.createElement('div');
@@ -491,7 +493,9 @@ async function handlePreviewPDF() {
         showAlert('Preview Error', 'Could not generate preview. Please try downloading directly.');
     }
 }
+
 let finalPdfLink = "";
+
 async function handleFormSubmit(e) {
     e.preventDefault();
     const editId = document.getElementById('editEventId') ? document.getElementById('editEventId').value : null;
@@ -513,12 +517,10 @@ async function handleFormSubmit(e) {
         // Add to Calendar (if logged in)
         if (userEmail && gapiInited) {
             try {
-                // await addToCalendar();
                 if (editId) {
                     // UPDATE EXISTING EVENT
                     console.log("Updating Event ID:", editId);
                     await updateCalendarEvent(editId);
-                    showAlert("Success", "Booking Updated Successfully!");
                     hideModal('loadingModal');
                     showAlert("Success", "Booking details updated successfully.");
                     showDashboard();
@@ -646,7 +648,6 @@ ${servicesText.length > 0 ? servicesText.join('\n') : 'No additional services se
 }
 
 async function updateCalendarEvent(eventId) {
-    // This reuses the logic from addToCalendar but sends 'update' instead of 'insert'
     const getTxt = (id) => document.getElementById(id).value;
     const name = getTxt('marriagePersonName');
     const mobile = getTxt('mobileNumber');
@@ -780,6 +781,7 @@ async function fetchBookings() {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="color:red">Error loading data.</td></tr>';
     }
 }
+
 /* ==================================================
    SEARCH & PAGINATION LOGIC
    ================================================== */
@@ -876,8 +878,7 @@ function renderPagination() {
     // Prev Button
     container.appendChild(createBtn('« Prev', currentPage - 1, false, currentPage === 1));
 
-    // Page Numbers (Simple version: Show all if < 7, otherwise intelligent truncate)
-    // For simplicity, let's show formatted 1, 2 ... Last
+    // Page Numbers
     for (let i = 1; i <= totalPages; i++) {
         // Show first, last, current, and neighbors
         if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
@@ -896,15 +897,6 @@ function renderPagination() {
     // Next Button
     container.appendChild(createBtn('Next »', currentPage + 1, false, currentPage === totalPages));
 }
-let currentEvent = null; // Store current event object
-
-async function getEventById(id) {
-    const response = await gapi.client.calendar.events.get({
-        'calendarId': 'primary',
-        'eventId': id
-    });
-    return response.result;
-}
 
 /* ==================================================
    DASHBOARD ACTIONS (View, Edit, Download)
@@ -912,34 +904,12 @@ async function getEventById(id) {
 
 // 1. VIEW: Fills the form but disables editing
 async function viewBooking(eventId) {
-    // Reuse edit logic to fill data
-    await editBooking(eventId);
-
-    // Lock all inputs
-    const inputs = document.querySelectorAll('#bookingForm input, #bookingForm button');
-    inputs.forEach(input => {
-        // Don't disable the "Close/Cancel" button
-        if(input.id !== 'cancelEditBtn') {
-            input.disabled = true;
-        }
-    });
-
-    // Change UI text
-    document.querySelector('.form-header h3').innerText = "View Booking Details";
-    const cancelBtn = document.getElementById('cancelEditBtn');
-    cancelBtn.innerText = "Close View";
-    cancelBtn.disabled = false; // Ensure close button works
-    
-    // Hide Submit/Preview buttons in View mode
-    document.getElementById('submitBtn').style.display = 'none';
-    document.getElementById('previewPdfBtn').style.display = 'none';
-}
-
-// 2. EDIT: Fills the form and allows changes
-async function editBooking(eventId) {
     showModal('loadingModal');
     
     try {
+        // First switch to booking form
+        showBookingForm();
+        
         // Fetch event from Google
         const response = await gapi.client.calendar.events.get({
             'calendarId': 'primary',
@@ -947,23 +917,18 @@ async function editBooking(eventId) {
         });
         const event = response.result;
 
-        // Switch to Form View
-        showBookingForm();
-
-        // Store ID so we know we are updating
+        // Store ID
         const idField = document.getElementById('editEventId');
         if (idField) idField.value = eventId;
 
         // --- POPULATE FORM FIELDS ---
-        // Helper to extract text from description
         const desc = event.description || "";
         const extract = (label) => {
-            const regex = new RegExp(`${label}: (.*)`);
+            const regex = new RegExp(`${label}: (.*?)(\\n|$)`);
             const match = desc.match(regex);
             return match ? match[1].trim() : '';
         };
 
-        // Helper to clean currency (remove ₹ and ,)
         const cleanAmt = (val) => {
             if (!val) return 0;
             return parseFloat(val.replace(/[₹,]/g, '')) || 0;
@@ -975,16 +940,22 @@ async function editBooking(eventId) {
         document.getElementById('customerFrom').value = extract('Customer City') || '';
         document.getElementById('amountGivenBy').value = extract('Booked By') || '';
 
-        // Fill Dates (Convert ISO to Input format)
+        // Fill Dates
         if(event.start && event.start.dateTime) {
             const start = new Date(event.start.dateTime);
             const end = new Date(event.end.dateTime);
-            // Adjust for timezone offset to show correctly in input
-            start.setMinutes(start.getMinutes() - start.getTimezoneOffset());
-            end.setMinutes(end.getMinutes() - end.getTimezoneOffset());
             
-            document.getElementById('fromDateTime').value = start.toISOString().slice(0,16);
-            document.getElementById('toDateTime').value = end.toISOString().slice(0,16);
+            const formatDateTime = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+            
+            document.getElementById('fromDateTime').value = formatDateTime(start);
+            document.getElementById('toDateTime').value = formatDateTime(end);
             document.getElementById('marriageDate').value = start.toISOString().split('T')[0];
         }
 
@@ -992,18 +963,126 @@ async function editBooking(eventId) {
         document.getElementById('totalHallAmount').value = cleanAmt(extract('Total Hall Amount'));
         document.getElementById('advanceAmount').value = cleanAmt(extract('Advance Paid'));
 
-        // Recalculate Pending & Total
+        // Recalculate
         calculateTotal();
 
-        // UI Updates
-        document.querySelector('.form-header h3').innerText = "Edit Booking";
+        // VIEW MODE SPECIFIC CHANGES
+        // Lock all inputs for view mode
+        const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea');
+        inputs.forEach(input => {
+            input.disabled = true;
+        });
+        
+        // Hide action buttons
+        document.getElementById('submitBtn').style.display = 'none';
+        document.getElementById('previewPdfBtn').style.display = 'none';
+        
+        // Show cancel button with "Close View" text
+        const cancelBtn = document.getElementById('cancelEditBtn');
+        cancelBtn.innerText = "Close View";
+        cancelBtn.style.display = 'inline-block';
+        cancelBtn.disabled = false;
+        
+        // Update header
+        document.querySelector('.form-header h3').innerText = "View Booking Details";
+        
+        hideModal('loadingModal');
+
+    } catch (error) {
+        console.error("View Error:", error);
+        hideModal('loadingModal');
+        showAlert("Error", "Could not load booking details.");
+        showDashboard(); // Go back to dashboard on error
+    }
+}
+
+// 2. EDIT: Fills the form and allows changes
+async function editBooking(eventId) {
+    showModal('loadingModal');
+    
+    try {
+        // First switch to booking form
+        showBookingForm();
+        
+        // Fetch event from Google
+        const response = await gapi.client.calendar.events.get({
+            'calendarId': 'primary',
+            'eventId': eventId
+        });
+        const event = response.result;
+
+        // Store ID so we know we are updating
+        const idField = document.getElementById('editEventId');
+        if (idField) idField.value = eventId;
+
+        // --- POPULATE FORM FIELDS ---
+        const desc = event.description || "";
+        const extract = (label) => {
+            const regex = new RegExp(`${label}: (.*?)(\\n|$)`);
+            const match = desc.match(regex);
+            return match ? match[1].trim() : '';
+        };
+
+        const cleanAmt = (val) => {
+            if (!val) return 0;
+            return parseFloat(val.replace(/[₹,]/g, '')) || 0;
+        };
+
+        // Fill Basic Info
+        document.getElementById('marriagePersonName').value = event.summary.replace('Marriage - ', '');
+        document.getElementById('mobileNumber').value = extract('Mobile Number') || '';
+        document.getElementById('customerFrom').value = extract('Customer City') || '';
+        document.getElementById('amountGivenBy').value = extract('Booked By') || '';
+
+        // Fill Dates
+        if(event.start && event.start.dateTime) {
+            const start = new Date(event.start.dateTime);
+            const end = new Date(event.end.dateTime);
+            
+            const formatDateTime = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+            
+            document.getElementById('fromDateTime').value = formatDateTime(start);
+            document.getElementById('toDateTime').value = formatDateTime(end);
+            document.getElementById('marriageDate').value = start.toISOString().split('T')[0];
+        }
+
+        // Fill Money
+        document.getElementById('totalHallAmount').value = cleanAmt(extract('Total Hall Amount'));
+        document.getElementById('advanceAmount').value = cleanAmt(extract('Advance Paid'));
+
+        // Recalculate
+        calculateTotal();
+
+        // EDIT MODE SPECIFIC CHANGES
+        // Ensure all inputs are enabled for editing
+        const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea');
+        inputs.forEach(input => {
+            input.disabled = false;
+        });
+        
+        // Show action buttons
+        document.getElementById('submitBtn').style.display = 'inline-flex';
+        document.getElementById('previewPdfBtn').style.display = 'inline-flex';
+        
+        // Update submit button for edit mode
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Booking';
-        submitBtn.classList.add('warning-btn'); // Optional styling
         
+        // Show cancel button with "Cancel Edit" text
         const cancelBtn = document.getElementById('cancelEditBtn');
-        cancelBtn.style.display = 'inline-block';
         cancelBtn.innerText = "Cancel Edit";
+        cancelBtn.style.display = 'inline-block';
+        cancelBtn.disabled = false;
+        
+        // Update header
+        document.querySelector('.form-header h3').innerText = "Edit Booking";
         
         hideModal('loadingModal');
 
@@ -1011,58 +1090,83 @@ async function editBooking(eventId) {
         console.error("Edit Error:", error);
         hideModal('loadingModal');
         showAlert("Error", "Could not load booking details.");
-        showDashboard(); // Go back on error
+        showDashboard(); // Go back to dashboard on error
     }
 }
 
 // 3. DOWNLOAD: Temporarily fills form to generate PDF, then resets
 async function downloadBookingPdf(eventId) {
-    // 1. Fill the form with data (in background)
-    await editBooking(eventId);
+    showModal('loadingModal');
     
-    // 2. Generate PDF
-    // We use a small timeout to ensure DOM is updated
-    setTimeout(async () => {
-        try {
-            await generatePDF();
-            // 3. Return to Dashboard after download
-            cancelEdit(); 
-            showDashboard();
-        } catch (e) {
-            console.error(e);
+    try {
+        // Fetch event from Google
+        const response = await gapi.client.calendar.events.get({
+            'calendarId': 'primary',
+            'eventId': eventId
+        });
+        const event = response.result;
+
+        // --- POPULATE FORM FIELDS (in background) ---
+        const desc = event.description || "";
+        const extract = (label) => {
+            const regex = new RegExp(`${label}: (.*?)(\\n|$)`);
+            const match = desc.match(regex);
+            return match ? match[1].trim() : '';
+        };
+
+        const cleanAmt = (val) => {
+            if (!val) return 0;
+            return parseFloat(val.replace(/[₹,]/g, '')) || 0;
+        };
+
+        // Fill Basic Info
+        document.getElementById('marriagePersonName').value = event.summary.replace('Marriage - ', '');
+        document.getElementById('mobileNumber').value = extract('Mobile Number') || '';
+        document.getElementById('customerFrom').value = extract('Customer City') || '';
+        document.getElementById('amountGivenBy').value = extract('Booked By') || '';
+
+        // Fill Dates
+        if(event.start && event.start.dateTime) {
+            const start = new Date(event.start.dateTime);
+            const end = new Date(event.end.dateTime);
+            
+            const formatDateTime = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+            
+            document.getElementById('fromDateTime').value = formatDateTime(start);
+            document.getElementById('toDateTime').value = formatDateTime(end);
+            document.getElementById('marriageDate').value = start.toISOString().split('T')[0];
         }
-    }, 500);
+
+        // Fill Money
+        document.getElementById('totalHallAmount').value = cleanAmt(extract('Total Hall Amount'));
+        document.getElementById('advanceAmount').value = cleanAmt(extract('Advance Paid'));
+
+        // Recalculate
+        calculateTotal();
+
+        // Wait for DOM to update
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Generate PDF
+        await generatePDF();
+        
+        hideModal('loadingModal');
+        
+    } catch (error) {
+        console.error("Download Error:", error);
+        hideModal('loadingModal');
+        showAlert("Error", "Could not generate PDF.");
+    }
 }
 
-// 4. CANCEL: Resets everything back to normal
-function cancelEdit() {
-    // 1. Reset Form
-    document.getElementById('bookingForm').reset();
-    
-    // 2. Clear Hidden ID (Safety Check)
-    const idField = document.getElementById('editEventId');
-    if (idField) idField.value = '';
-
-    // 3. Re-enable inputs (in case we were in View mode)
-    const inputs = document.querySelectorAll('#bookingForm input, #bookingForm button');
-    inputs.forEach(input => input.disabled = false);
-
-    // 4. Reset UI Buttons
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Download';
-    submitBtn.style.display = 'inline-flex'; // Make sure it's visible
-    submitBtn.classList.remove('warning-btn');
-
-    document.getElementById('previewPdfBtn').style.display = 'inline-flex';
-    document.getElementById('cancelEditBtn').style.display = 'none';
-    document.querySelector('.form-header h3').innerText = "Wedding Hall Booking Form";
-
-    // 5. Reset Defaults
-    setDefaultDate();
-    calculateTotal();
-    showDashboard();
-}
-
+// 4. DELETE: Confirms and deletes booking
 async function deleteBooking(eventId) {
     // 1. Ask for confirmation
     const isConfirmed = confirm("⚠️ Are you sure you want to DELETE this booking?\n\nThis action cannot be undone.");
@@ -1088,6 +1192,36 @@ async function deleteBooking(eventId) {
             showAlert("Error", "Failed to delete booking.");
         }
     }
+}
+
+// 5. CANCEL EDIT: Resets form and returns to dashboard
+function cancelEdit() {
+    // 1. Reset Form
+    document.getElementById('bookingForm').reset();
+    
+    // 2. Clear Hidden ID
+    const idField = document.getElementById('editEventId');
+    if (idField) idField.value = '';
+
+    // 3. Re-enable inputs
+    const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea');
+    inputs.forEach(input => input.disabled = false);
+
+    // 4. Reset UI Buttons
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Download';
+    submitBtn.style.display = 'inline-flex';
+
+    document.getElementById('previewPdfBtn').style.display = 'inline-flex';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    document.querySelector('.form-header h3').innerText = "Wedding Hall Booking Form";
+
+    // 5. Reset Defaults
+    setDefaultDate();
+    calculateTotal();
+    
+    // 6. Navigate back to dashboard
+    showDashboard();
 }
 
 function populatePDFTemplate() {
@@ -1170,10 +1304,10 @@ function generatePDF() {
 
             // Generate PDF with optimized settings
             const element = document.getElementById('pdf-template');
-            const fileName = `Cauvery_Booking_${document.getElementById('marriagePersonName').value}.pdf`;
+            const fileName = `Cauvery_Booking_${document.getElementById('marriagePersonName').value.replace(/\s+/g, '_')}.pdf`;
             const opt = {
                 margin: [10, 10, 10, 10],
-                filename: `Cauvery_Wedding_Booking_${getTxt('marriagePersonName').replace(/\s+/g, '_')}.pdf`,
+                filename: fileName,
                 image: { 
                     type: 'jpeg', 
                     quality: 1 
@@ -1198,19 +1332,8 @@ function generatePDF() {
                 }
             };
 
-            // html2pdf()
-            //     .set(opt)
-            //     .from(element)
-            //     .save()
-            //     .then(() => {
-            //         resolve();
-            //     })
-            //     .catch(err => {
-            //         console.error('PDF generation error:', err);
-            //         reject(err);
-            //     });
             html2pdf().set(opt).from(element).output('blob').then((blob) => {
-            // 1. Download it locally for you
+                // 1. Download it locally
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1219,7 +1342,7 @@ function generatePDF() {
                 
                 // 2. Return the blob and filename for Drive Upload
                 resolve({ blob, fileName });
-            })
+            });
 
         } catch (error) {
             console.error('PDF preparation error:', error);
@@ -1227,6 +1350,7 @@ function generatePDF() {
         }
     });
 }
+
 async function uploadToDrive(pdfBlob, fileName) {
     try {
         // 1. Metadata
@@ -1248,17 +1372,15 @@ async function uploadToDrive(pdfBlob, fileName) {
             body: form
         });
         
-        // --- SAFETY CHECK START ---
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Drive Upload Failed: ${errorText}`);
         }
-        // --- SAFETY CHECK END ---
 
         const file = await response.json();
         console.log("File Uploaded:", file);
 
-        // 4. Make Public (Only if file exists)
+        // 4. Make Public
         if (file.id) {
             await gapi.client.drive.permissions.create({
                 fileId: file.id,
@@ -1273,42 +1395,89 @@ async function uploadToDrive(pdfBlob, fileName) {
 
     } catch (error) {
         console.error("Drive Upload Error:", error);
-        // Don't crash the whole app, just return null so the user gets the PDF but no link
         return null; 
     }
 }
+
 function openWhatsApp() {
     // 1. Get Data
-    const mobile = document.getElementById('mobileNumber').value;
+    let mobile = document.getElementById('mobileNumber').value;
     const name = document.getElementById('marriagePersonName').value;
-    const date = document.getElementById('marriageDate').value;
-    mobile = '91' + mobile;
+    const fromDateTime = document.getElementById('fromDateTime').value;
+    const toDateTime = document.getElementById('toDateTime').value;
     
-    // Format Date for message
-    const dateObj = new Date(date);
-    const dateStr = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-
-    // 2. Build the Message (Use %0a for new lines)
-    // We use encodeURIComponent to ensure special characters don't break the link
-    let message = `*CAUVERY WEDDING HALL - BOOKING CONFIRMATION* %0a`;
-    message += `--------------------------------%0a`;
-    message += `📅 *Date:* ${dateStr}%0a`;
-    message += `👤 *Name:* ${name}%0a`;
-    message += `💰 *Total Amount:* ₹${bookingData.totalHall.toLocaleString('en-IN')}%0a`;
-    message += `💵 *Advance Paid:* ₹${bookingData.advance.toLocaleString('en-IN')}%0a`;
-    message += `❗ *Pending Amount:* ₹${bookingData.pending.toLocaleString('en-IN')}%0a`;
-    message += `--------------------------------%0a`;
-    message += `Thank you for booking with us! Please find the official receipt attached below. 👇`;
-    if (finalPdfLink) {
-        message += `\n📄 *Download Receipt:* ${finalPdfLink}`;
+    // Validate mobile number
+    if (!mobile || mobile.length < 10) {
+        showAlert('Error', 'Please enter a valid mobile number');
+        return;
     }
+    
+    // Add India country code (remove any existing +91 or 0 prefix)
+        mobile = '91' + mobile;
+    
+    // Format dates
+    const formatDateTime = (dateStr) => {
+        const date = new Date(dateStr);
+        return date.toLocaleString('en-IN', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
 
-    // 3. Open WhatsApp
-    // '91' is added for India country code
+    const fromStr = formatDateTime(fromDateTime);
+    const toStr = formatDateTime(toDateTime);
+
+    // 2. Build the Message
+    let message = `*🎉 CAUVERY WEDDING HALL - BOOKING CONFIRMATION 🎉*\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `👤 *Customer Name:* ${name}\n`;
+    message += `📅 *Event Time:*\n`;
+    message += `   From: ${fromStr}\n`;
+    message += `   To: ${toStr}\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `💰 *PAYMENT DETAILS*\n`;
+    message += `Hall Rent: ₹${bookingData.totalHall.toLocaleString('en-IN')}\n`;
+    message += `Advance Paid: ₹${bookingData.advance.toLocaleString('en-IN')}\n`;
+    message += `*Pending: ₹${bookingData.pending.toLocaleString('en-IN')}*\n\n`;
+    
+    // Add services if any
+    if (bookingData.fees.cleaning > 0 || bookingData.fees.ac > 0 || 
+        bookingData.fees.lights > 0 || bookingData.fees.speaker > 0 || 
+        bookingData.fees.ilai > 0 || bookingData.fees.other > 0) {
+        message += `*Additional Services:*\n`;
+        if (bookingData.fees.cleaning > 0) message += `• Cleaning: ₹${bookingData.fees.cleaning.toLocaleString('en-IN')}\n`;
+        if (bookingData.fees.ac > 0) message += `• AC Rooms: ₹${bookingData.fees.ac.toLocaleString('en-IN')}\n`;
+        if (bookingData.fees.lights > 0) message += `• Serial Lights: ₹${bookingData.fees.lights.toLocaleString('en-IN')}\n`;
+        if (bookingData.fees.speaker > 0) message += `• Speaker: ₹${bookingData.fees.speaker.toLocaleString('en-IN')}\n`;
+        if (bookingData.fees.ilai > 0) message += `• Sapadu Ilai: ₹${bookingData.fees.ilai.toLocaleString('en-IN')}\n`;
+        if (bookingData.fees.other > 0) message += `• ${bookingData.fees.otherTitle}: ₹${bookingData.fees.other.toLocaleString('en-IN')}\n`;
+        message += `\n`;
+    }
+    
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `🧾 *FINAL TOTAL: ₹${bookingData.finalTotal.toLocaleString('en-IN')}*\n\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `📝 *Important Notes:*\n`;
+    message += `⚡ Electricity: ₹30/Unit (Extra)\n`;
+    message += `💧 Can water available\n`;
+    message += `⚠️ No generator facility\n\n`;
+    
+    if (finalPdfLink) {
+        message += `📄 *Download Receipt:*\n${finalPdfLink}\n\n`;
+    }
+    
+    message += `Thank you for choosing Cauvery Wedding Hall! 🙏\n\n`;
+    message += `📞 Contact: +91 99446 45441`;
+
+    // 3. Encode and open WhatsApp
     const encodedMessage = encodeURIComponent(message);
-
-    // 4. Open WhatsApp
     const url = `https://wa.me/${mobile}?text=${encodedMessage}`;
+    
+    // Open in new tab
     window.open(url, '_blank');
 }
 
@@ -1338,22 +1507,49 @@ function showAlert(title, msg) {
 function closeModal(id) {
     hideModal(id);
 }
+
 function showDashboard() {
+    // Hide booking section, show dashboard
     document.getElementById('bookingSection').style.display = 'none';
     document.getElementById('dashboardSection').style.display = 'block';
+    
+    // Update button visibility
     document.getElementById('navDashboard').style.display = 'none';
-    document.getElementById('navNewBooking').style.display = 'flex'; // Show "New Booking" button
-    fetchBookings(); // Load data
+    document.getElementById('navNewBooking').style.display = 'flex';
+    
+    // Load data
+    fetchBookings();
 }
 
 function showBookingForm() {
+    // Show booking section, hide dashboard
     document.getElementById('bookingSection').style.display = 'block';
     document.getElementById('dashboardSection').style.display = 'none';
-    document.getElementById('navDashboard').style.display = 'flex'; // Show "Dashboard" button
+    
+    // Update button visibility
+    document.getElementById('navDashboard').style.display = 'flex';
     document.getElementById('navNewBooking').style.display = 'none';
     
-    // Reset form for new entry
-    cancelEdit();
+    // Reset form for new entry (but keep user in booking form)
+    // Don't call cancelEdit() here as it would trigger showDashboard()
+    document.getElementById('bookingForm').reset();
+    
+    const idField = document.getElementById('editEventId');
+    if (idField) idField.value = '';
+
+    const inputs = document.querySelectorAll('#bookingForm input, #bookingForm select, #bookingForm textarea');
+    inputs.forEach(input => input.disabled = false);
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Download';
+    submitBtn.style.display = 'inline-flex';
+
+    document.getElementById('previewPdfBtn').style.display = 'inline-flex';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    document.querySelector('.form-header h3').innerText = "Wedding Hall Booking Form";
+
+    setDefaultDate();
+    calculateTotal();
 }
 
 // Close modal on outside click
