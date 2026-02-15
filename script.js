@@ -2,8 +2,8 @@
    CAUVERY WEDDING HALL - COMPLETE WORKING VERSION
    All Functions Implemented
    ================================================== */
-const CLIENT_ID = '194658348326-6it21orc6nnhaj17s0a2536t5c8lt9v6.apps.googleusercontent.com'; 
-const API_KEY = 'AIzaSyCfQU6b59gao-oypLobWMXhb4SSD5XpHVQ';
+const CLIENT_ID = '1014223260371-432m0e18e2fuaq8ii07rbrlr5kh8temb.apps.googleusercontent.com'; 
+const API_KEY = 'AIzaSyCNNSJwbXwiqtoHw8b-mUBuqfdid4s0aJA';
 
 const DISCOVERY_DOCS = [
     'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
