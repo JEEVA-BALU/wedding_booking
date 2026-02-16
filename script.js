@@ -2,9 +2,10 @@
    CAUVERY WEDDING HALL - COMPLETE WORKING VERSION
    All Functions Implemented
    ================================================== */
+// const CLIENT_ID = '194658348326-6it21orc6nnhaj17s0a2536t5c8lt9v6.apps.googleusercontent.com'; 
+// const API_KEY = 'AIzaSyCfQU6b59gao-oypLobWMXhb4SSD5XpHVQ';
 const CLIENT_ID = '1014223260371-432m0e18e2fuaq8ii07rbrlr5kh8temb.apps.googleusercontent.com'; 
 const API_KEY = 'AIzaSyCNNSJwbXwiqtoHw8b-mUBuqfdid4s0aJA';
-
 const DISCOVERY_DOCS = [
     'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
     'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
@@ -72,49 +73,38 @@ function loadUserSession() {
 
 function updateSignInButton(email, info) {
     const btn = document.getElementById('googleSignInBtn');
-    
-    // Styling for "Logged In" state
+    const logoutBtn = document.getElementById('googleLogoutBtn');
+
+    // 1. Show Logout Button
+    if (logoutBtn) {
+        logoutBtn.style.display = 'inline-flex';
+    }
+
+    // 2. Style Login Button
     btn.classList.remove('disabled');
     btn.classList.add('success');
-    btn.removeAttribute('disabled'); // Ensure it's clickable
+    btn.removeAttribute('disabled');
     
-    // Set content
+    // Get Name and Initial
+    const displayName = info.given_name || email || 'User';
+    const initial = displayName.charAt(0).toUpperCase();
+
+    // 3. Set HTML with classes for Responsive Switching
     btn.innerHTML = `
-        <i class="fas fa-user-circle" style="font-size: 1.1em;"></i>
-        <span id="btnText" style="margin: 0 8px;">${email}</span>
-        <i class="fas fa-chevron-down" style="font-size: 0.8em;"></i>
+        <span class="desktop-content" style="display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-user-circle"></i> 
+            <span>${displayName}</span>
+        </span>
+        
+        <span class="mobile-content" style="display: none; font-size: 18px;">
+            ${initial}
+        </span>
     `;
     
-    // FIX: Explicitly remove old listener and add new one
-    btn.onclick = null; 
+    // Keep the dropdown toggle if you still use it, otherwise remove
     btn.onclick = function(e) {
         toggleUserDropdown(e);
     };
-    
-    // Create Dropdown HTML if it doesn't exist
-    if (!document.getElementById('userDropdown')) {
-        const dropdown = document.createElement('div');
-        dropdown.id = 'userDropdown';
-        dropdown.className = 'user-dropdown';
-        dropdown.innerHTML = `
-            <div class="user-dropdown-header">
-                ${info && info.picture ? 
-                    `<img src="${info.picture}" alt="Profile" class="user-avatar">` : 
-                    '<i class="fas fa-user-circle user-avatar-icon"></i>'}
-                <div class="user-dropdown-info">
-                    <div class="user-dropdown-name">${email}</div>
-                    <div class="user-dropdown-email">Google Account</div>
-                </div>
-            </div>
-            <div class="user-dropdown-divider"></div>
-            <button class="user-dropdown-item" onclick="handleLogout()">
-                <i class="fas fa-sign-out-alt"></i>
-                <span>Logout</span>
-            </button>
-        `;
-        // Append to the parent of the button so it sits next to it
-        btn.parentElement.appendChild(dropdown);
-    }
 }
 
 function toggleUserDropdown(e) {
@@ -123,23 +113,66 @@ function toggleUserDropdown(e) {
         e.stopPropagation();
     }
     
-    const dropdown = document.getElementById('userDropdown');
     const btn = document.getElementById('googleSignInBtn');
+    const container = btn.parentElement; // div.google-mail
     
-    if (dropdown) {
-        // Toggle the class
-        const isShown = dropdown.classList.contains('show');
-        
-        // Close all other dropdowns first (like notifications)
-        document.querySelectorAll('.notification-dropdown, .user-dropdown').forEach(el => {
-            el.classList.remove('show');
-        });
-
-        // If it wasn't shown before, show it now
-        if (!isShown) {
-            dropdown.classList.add('show');
-        }
+    // 1. Remove any existing dropdown (prevents duplicates/stale state)
+    const existing = document.getElementById('userDropdown');
+    if (existing) {
+        const wasShown = existing.classList.contains('show');
+        existing.remove();
+        if(wasShown) return; // If it was open, we just closed it. Stop here.
     }
+
+    // 2. Close other dropdowns
+    document.querySelectorAll('.notification-dropdown').forEach(el => {
+        el.classList.remove('show');
+    });
+
+    // 3. Create New Dropdown
+    const dropdown = document.createElement('div');
+    dropdown.id = 'userDropdown';
+    dropdown.className = 'user-dropdown show'; // Add 'show' class immediately
+
+    // 4. Determine Content based on Login Status
+    if (userEmail && userInfo) {
+        // === LOGGED IN CONTENT ===
+        dropdown.innerHTML = `
+            <div class="user-dropdown-header">
+                ${userInfo.picture ? 
+                    `<img src="${userInfo.picture}" alt="Profile" class="user-avatar">` : 
+                    '<i class="fas fa-user-circle user-avatar-icon"></i>'}
+                <div class="user-dropdown-info">
+                    <div class="user-dropdown-name">${userInfo.name}</div>
+                    <div class="user-dropdown-email">${userEmail}</div>
+                </div>
+            </div>
+            <div class="user-dropdown-divider"></div>
+            <button class="user-dropdown-item" onclick="handleLogout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        `;
+    } else {
+        // === LOGGED OUT CONTENT ===
+        dropdown.innerHTML = `
+            <div class="user-dropdown-header">
+                <i class="fas fa-user-slash user-avatar-icon" style="color: #95a5a6;"></i>
+                <div class="user-dropdown-info">
+                    <div class="user-dropdown-name">Not Signed In</div>
+                    <div class="user-dropdown-email">Guest Mode</div>
+                </div>
+            </div>
+            <div class="user-dropdown-divider"></div>
+            <button class="user-dropdown-item" onclick="handleAuthClick(); document.getElementById('userDropdown').remove();">
+                <i class="fab fa-google" style="color: #4285F4;"></i>
+                <span>Sign In with Google</span>
+            </button>
+        `;
+    }
+
+    // 5. Append to DOM
+    container.appendChild(dropdown);
 }
 // Close dropdowns when clicking outside
 document.addEventListener('click', function(e) {
@@ -1054,7 +1087,7 @@ function gisLoaded() {
 }
 
 function checkGoogleLibraryStatus() {
-    // FIX: If already logged in (from localStorage), do NOT touch the button
+    // If already logged in, do nothing (loadUserSession handles it)
     if (userEmail) return; 
 
     const btn = document.getElementById('googleSignInBtn');
@@ -1062,7 +1095,6 @@ function checkGoogleLibraryStatus() {
     const txt = document.getElementById('btnText');
 
     const timer = setInterval(() => {
-        // Double check inside the timer too
         if (userEmail) {
             clearInterval(timer);
             return;
@@ -1071,28 +1103,30 @@ function checkGoogleLibraryStatus() {
         if (gapiInited && gisInited) {
             btn.classList.remove('disabled');
             btn.removeAttribute('disabled');
-            loader.classList.remove('fa-spinner', 'fa-spin');
-            loader.classList.add('fa-google');
-            txt.innerText = "Sign in with Google";
             
-            // Ensure the click triggers login, not dropdown
-            btn.onclick = handleAuthClick; 
+            // STATE: LOGGED OUT - Ready to click
+            loader.classList.remove('fa-spinner', 'fa-spin');
+            loader.classList.add('fa-user'); // Generic user icon
+            txt.innerText = "Guest Account"; // Text before login
+            
+            // IMPORTANT: Open dropdown instead of direct login
+            btn.onclick = function(e) {
+                toggleUserDropdown(e);
+            };
             
             clearInterval(timer);
         }
     }, 500);
 
-    // Timeout fallback
     setTimeout(() => {
         if ((!gapiInited || !gisInited) && !userEmail) {
             clearInterval(timer);
             loader.classList.remove('fa-spinner', 'fa-spin');
             loader.classList.add('fa-exclamation-triangle');
-            txt.innerText = "Calendar Unavailable";
+            txt.innerText = "Unavailable";
         }
     }, 10000);
 }
-
 function handleAuthClick() {
     if(!gapiInited || !gisInited) {
         showAlert('Calendar Setup', 'Google Calendar integration is optional.');
