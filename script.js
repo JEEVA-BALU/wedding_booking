@@ -1133,6 +1133,7 @@ function handleAuthClick() {
         return;
     }
 
+    // Define what happens after the user selects an account
     tokenClient.callback = async (resp) => {
         if (resp.error) {
             console.error('Auth error:', resp);
@@ -1141,10 +1142,10 @@ function handleAuthClick() {
         }
         
         try {
-            // Save token
+            // 1. Save token
             saveToLocalStorage('accessToken', resp.access_token);
             
-            // Get user info
+            // 2. Get user info
             const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                 headers: { Authorization: `Bearer ${resp.access_token}` }
             });
@@ -1153,24 +1154,26 @@ function handleAuthClick() {
             userEmail = info.email;
             userInfo = info;
             
+            // 3. Save User Data
             saveToLocalStorage('userEmail', userEmail);
             saveToLocalStorage('userInfo', userInfo);
             
+            // 4. Update UI
             updateSignInButton(userEmail, userInfo);
             showAlert('Success', 'Logged in successfully!');
             
+            // 5. Load Dashboard
             setTimeout(() => showDashboard(), 1000);
+
         } catch (error) {
             console.error('Error:', error);
             showAlert('Error', 'Could not retrieve user information.');
         }
     };
 
-    if (gapi.client.getToken() === null) {
-        tokenClient.requestAccessToken({prompt: 'consent'});
-    } else {
-        tokenClient.requestAccessToken({prompt: ''});
-    }
+    // --- THIS IS THE KEY CHANGE ---
+    // 'select_account' forces the Account Chooser screen to appear every time.
+    tokenClient.requestAccessToken({prompt: 'select_account'});
 }
 
 /* ENHANCED WHATSAPP WITH LOADER */
