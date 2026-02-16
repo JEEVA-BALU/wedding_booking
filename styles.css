@@ -139,7 +139,11 @@ body {
 .notification-wrapper {
     position: relative;
 }
-
+@media (max-width: 480px) {
+.notification-wrapper{
+   margin-right: auto;
+}
+}
 .notification-btn {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
@@ -446,6 +450,11 @@ body {
 .booking-section {
     padding: 30px 0 120px;
 }
+@media (max-width: 480px) {
+.booking-section {
+   padding: 0px 0 120px;
+}
+}
 
 .form-card { 
     background: var(--white);
@@ -455,6 +464,11 @@ body {
     overflow: hidden;
     animation: zoomIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid rgba(255, 107, 53, 0.1);
+}
+@media (max-width: 480px) {
+.form-card { 
+   margin-top: 10px;
+}
 }
 
 @keyframes zoomIn {
@@ -498,7 +512,11 @@ body {
     font-size: 30px;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
-
+@media (max-width: 480px) {
+.form-header h3 {
+    font-size: 18px;
+}
+}
 .form-section { 
     padding: 32px; 
     border-bottom: 1px solid var(--border);
@@ -519,7 +537,11 @@ body {
     gap: 12px;
     font-weight: 700;
 }
-
+@media (max-width: 480px) {
+.section-title {
+    margin-bottom: 10px;
+}
+}
 .section-title i {
     background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
     color: white;
@@ -804,6 +826,16 @@ body {
     font-weight: 800;
     text-shadow: 0 2px 15px rgba(253, 203, 110, 0.4);
     animation: priceGlow 2s ease-in-out infinite;
+}
+@media (max-width: 480px) {
+.total-display {
+     flex-direction: row;
+     justify-content: center;
+     align-items: center;
+}
+.total-display h2 {
+        font-size: 20px !important;
+ }
 }
 
 @keyframes priceGlow {
@@ -1810,8 +1842,12 @@ body {
     }
 
     .form-section {
-        padding: 24px 18px 110px;
+        padding: 10px 18px 10px;
     }
+    .form-section:last-of-type {
+        padding: 10px 18px 10px;
+    }
+
 
     .section-title {
         font-size: 16px;
@@ -2151,4 +2187,71 @@ select option[value="REFUND"],
 .google-mail{
      width: 48%;
 }
+}
+/* =========================================
+   RESPONSIVE HEADER BUTTONS (Round Circles)
+   ========================================= */
+
+/* Default (Desktop) - Hide Mobile Content */
+.mobile-content { display: none !important; }
+.desktop-content { display: flex !important; }
+
+@media (max-width: 768px) {
+    
+    /* 1. Reset Container Widths */
+    .header-actions {
+        gap: 10px;
+        justify-content: flex-end; /* Align to right */
+    }
+    .google-mail { 
+        width: auto !important; /* Override percentage widths */
+    }
+
+    /* 2. LOGOUT BUTTON: Round Icon Only */
+    #googleLogoutBtn {
+        width: 40px;
+        height: 40px;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        justify-content: center;
+        align-items: center;
+        margin-right: 5px !important;
+    }
+    
+    /* Hide the text "Logout" inside the button */
+    #googleLogoutBtn span {
+        display: none; 
+    }
+    
+    /* Ensure icon is centered and correct size */
+    #googleLogoutBtn i {
+        margin: 0;
+        font-size: 16px;
+    }
+
+    /* 3. LOGIN BUTTON: Round Initial Only */
+    #googleSignInBtn {
+        width: 40px;
+        height: 40px;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Toggle Content Visibility */
+    #googleSignInBtn .desktop-content {
+        display: none !important;
+    }
+    
+    #googleSignInBtn .mobile-content {
+        display: block !important;
+        font-weight: 700;
+        line-height: 1;
+    }
+    
+    /* Hide the dropdown arrow if present */
+    #googleSignInBtn .fa-chevron-down {
+        display: none;
+    }
 }
