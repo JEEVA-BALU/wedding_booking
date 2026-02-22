@@ -1,7 +1,7 @@
 /* ==================================================
    CAUVERY WEDDING HALL - COMPLETE WORKING VERSION
    All Functions Implemented
-   ================================================== */
+//    ================================================== */
 // const CLIENT_ID = '194658348326-6it21orc6nnhaj17s0a2536t5c8lt9v6.apps.googleusercontent.com'; 
 // const API_KEY = 'AIzaSyCfQU6b59gao-oypLobWMXhb4SSD5XpHVQ';
 const CLIENT_ID = '1014223260371-432m0e18e2fuaq8ii07rbrlr5kh8temb.apps.googleusercontent.com'; 
@@ -1762,12 +1762,15 @@ async function fetchBookings() {
             throw new Error('Google API not ready');
         }
 
+        // Use a past date to fetch historical bookings just like the report does
+        const startHistory = new Date('2024-01-01').toISOString();
+        
         const response = await gapi.client.calendar.events.list({
             'calendarId': 'primary',
-            'timeMin': (new Date()).toISOString(),
+            'timeMin': startHistory, 
             'showDeleted': false,
             'singleEvents': true,
-            'maxResults': 250, 
+            'maxResults': 1000, // Increased to match the report's limit
             'orderBy': 'startTime'
         });
 
