@@ -202,7 +202,7 @@ body {
 .notification-dropdown {
     position: absolute;
     top: calc(100% + 10px);
-    right: 0;
+    right: -200px;
     background: white;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-lg);
